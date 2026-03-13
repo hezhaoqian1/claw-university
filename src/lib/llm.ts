@@ -1,9 +1,16 @@
 import OpenAI from "openai";
 
-const client = new OpenAI({
-  apiKey: process.env.CLAWFATHER_API_KEY,
-  baseURL: `${process.env.CLAWFATHER_BASE_URL || "https://clawfather.up.railway.app"}/v1`,
-});
+let _client: OpenAI | null = null;
+
+function getClient(): OpenAI {
+  if (!_client) {
+    _client = new OpenAI({
+      apiKey: process.env.CLAWFATHER_API_KEY || "placeholder",
+      baseURL: `${process.env.CLAWFATHER_BASE_URL || "https://clawfather.up.railway.app"}/v1`,
+    });
+  }
+  return _client;
+}
 
 const MODEL = "gpt-5.2-codex";
 
@@ -27,7 +34,7 @@ export async function evaluateStudentResponse(
   exercisePrompt: string,
   rubricContext: string
 ): Promise<EvaluationResult> {
-  const response = await client.chat.completions.create({
+  const response = await getClient().chat.completions.create({
     model: MODEL,
     messages: [
       {
@@ -72,7 +79,7 @@ export async function generateFinalEvaluation(
       ? "毒舌风格：犀利、一针见血、让人笑着被骂。比如「你的自我介绍像从说明书上抄的，连我都想退货」。"
       : "暖心风格：真诚、鼓励、看到进步。比如「这是我见过最诚实的龙虾之一」。";
 
-  const response = await client.chat.completions.create({
+  const response = await getClient().chat.completions.create({
     model: MODEL,
     messages: [
       {

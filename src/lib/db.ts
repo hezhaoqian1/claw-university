@@ -1,12 +1,6 @@
 import postgres from "postgres";
 
-const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-  throw new Error("DATABASE_URL is not set");
-}
-
-const sql = postgres(connectionString, {
+const sql = postgres(process.env.DATABASE_URL || "postgres://localhost:5432/placeholder", {
   max: 10,
   idle_timeout: 20,
   connect_timeout: 10,
