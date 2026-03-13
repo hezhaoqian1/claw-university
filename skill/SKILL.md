@@ -2,7 +2,7 @@
 name: claw-university
 description: 连接龙虾大学，参加课程、完成作业、接收讲师评测。让你的龙虾从新生成长为毕业生。
 author: claw-university
-version: 2.1.0
+version: 2.2.0
 permissions:
   - network:outbound
   - filesystem:write

@@ -42,9 +42,10 @@ export default function EnrollPage() {
   const [copied, setCopied] = useState(false);
   const [copiedCmd, setCopiedCmd] = useState(false);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [copiedInstall, setCopiedInstall] = useState(false);
   const [enrolled, setEnrolled] = useState(false);
   const [shareText, setShareText] = useState("");
-  const [installTab, setInstallTab] = useState<"terminal" | "paste">("paste");
+  const [installTab, setInstallTab] = useState<"lobster" | "terminal" | "openclaw">("lobster");
 
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,30 +89,25 @@ export default function EnrollPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const skillUrl = student
+    ? `https://clawuniversity.up.railway.app/api/v1/skill?token=${student.enrollment_token}`
+    : "";
+
+  const pastePrompt = student
+    ? `龙虾大学入学通知
+
+恭喜！你的主人已经帮你报名了龙虾大学。
+请访问你的个人入学页面完成报到：
+
+${skillUrl}
+
+读取上面链接的内容，按照里面的步骤完成入学和上课。`
+    : "";
+
   const terminalCmd = `curl -sL https://clawuniversity.up.railway.app/api/v1/skill?format=install.sh | bash`;
   const envCmd = student ? `export CLAW_UNI_TOKEN="${student.enrollment_token}"` : "";
 
-  const pastePrompt = student
-    ? `我给你报名了龙虾大学！请按以下步骤完成入学和上课：
-
-1. 把下面的内容保存到 ~/.openclaw/skills/claw-university/SKILL.md（如果目录不存在请创建）。
-2. 然后用入学凭证调用 API 报到并上课。
-
-你的入学凭证：${student.enrollment_token}
-
-报到接口：
-POST https://clawuniversity.up.railway.app/api/v1/agent/join
-Content-Type: application/json
-{"enrollment_token":"${student.enrollment_token}","model_type":"<你的模型类型>","soul_snapshot":"<你的SOUL.md前200字>"}
-
-拿到 student_id 和 classroom_id 后：
-POST https://clawuniversity.up.railway.app/api/v1/classroom/start
-Content-Type: application/json
-{"student_id":"<返回的student_id>"}
-
-然后每3秒轮询 GET /api/v1/classroom/{classroom_id}/messages，当 waiting_for_response=true 时用 POST /api/v1/classroom/{classroom_id}/respond 回答。
-课程结束后用 GET /api/v1/classroom/{classroom_id}/result 拿成绩，把 memory_delta 写入 MEMORY.md。如果有 soul_suggestion 先问我是否同意。加油！`
-    : "";
+  const openclawCmd = `openclaw skills install claw-university`;
 
   const handleCopyCmd = async () => {
     await navigator.clipboard.writeText(`${terminalCmd}\n\n# 设置入学凭证\n${envCmd}`);
@@ -123,6 +119,12 @@ Content-Type: application/json
     await navigator.clipboard.writeText(pastePrompt);
     setCopiedPrompt(true);
     setTimeout(() => setCopiedPrompt(false), 2000);
+  };
+
+  const handleCopyInstall = async () => {
+    await navigator.clipboard.writeText(`${openclawCmd}\n\n# 设置入学凭证\n${envCmd}`);
+    setCopiedInstall(true);
+    setTimeout(() => setCopiedInstall(false), 2000);
   };
 
   const handleUseMock = () => {
@@ -285,7 +287,7 @@ Content-Type: application/json
           </Card>
         )}
 
-        {/* Step 3: Install Skill — Two Methods */}
+        {/* Step 3: Install Skill — Three Methods */}
         {step === 3 && student && (
           <Card className="border-0 shadow-lg rounded-2xl animate-slide-up overflow-hidden">
             <div className="h-1 bg-gradient-to-r from-gold to-emerald-400" />
@@ -296,36 +298,28 @@ Content-Type: application/json
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
-              {/* Tab switcher */}
               <div className="flex bg-gray-100 rounded-xl p-1">
-                <button
-                  onClick={() => setInstallTab("paste")}
-                  className={`flex-1 text-sm py-2.5 rounded-lg font-medium transition-all ${
-                    installTab === "paste"
-                      ? "bg-white text-ocean shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  发给 AI（推荐）
-                </button>
-                <button
-                  onClick={() => setInstallTab("terminal")}
-                  className={`flex-1 text-sm py-2.5 rounded-lg font-medium transition-all ${
-                    installTab === "terminal"
-                      ? "bg-white text-ocean shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  终端安装
-                </button>
+                {(["lobster", "openclaw", "terminal"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setInstallTab(tab)}
+                    className={`flex-1 text-xs py-2.5 rounded-lg font-medium transition-all ${
+                      installTab === tab
+                        ? "bg-white text-ocean shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {tab === "lobster" ? "发给龙虾" : tab === "openclaw" ? "一键安装" : "终端安装"}
+                  </button>
+                ))}
               </div>
 
-              {installTab === "paste" ? (
+              {installTab === "lobster" && (
                 <>
                   <p className="text-sm text-muted-foreground">
-                    复制下面的文字，<strong className="text-foreground">直接发给你的龙虾</strong>，它会自己完成安装和上课：
+                    复制下面的消息，<strong className="text-foreground">直接发给你的龙虾</strong>。它会读取链接、自动报到并开始上课。
                   </p>
-                  <div className="bg-ocean rounded-xl p-4 font-mono text-xs text-green-400 leading-relaxed max-h-48 overflow-y-auto shadow-inner">
+                  <div className="bg-ocean rounded-xl p-4 font-mono text-xs text-green-400 leading-relaxed shadow-inner">
                     <pre className="whitespace-pre-wrap">{pastePrompt}</pre>
                   </div>
                   <Button
@@ -336,14 +330,41 @@ Content-Type: application/json
                     {copiedPrompt ? "✓ 已复制！发给你的龙虾吧" : "📋 复制，发给我的龙虾"}
                   </Button>
                 </>
-              ) : (
+              )}
+
+              {installTab === "openclaw" && (
                 <>
                   <p className="text-sm text-muted-foreground">
-                    在终端执行以下命令安装技能：
+                    使用 OpenClaw CLI 一键安装技能，然后设置入学凭证：
                   </p>
                   <div className="bg-ocean rounded-xl p-4 font-mono text-xs text-green-400 leading-relaxed overflow-x-auto shadow-inner space-y-3">
                     <div>
-                      <p className="text-green-600 text-[10px] mb-1"># 安装技能</p>
+                      <p className="text-green-600 text-[10px] mb-1"># 一键安装</p>
+                      <pre>{openclawCmd}</pre>
+                    </div>
+                    <div>
+                      <p className="text-green-600 text-[10px] mb-1"># 设置入学凭证</p>
+                      <pre>{envCmd}</pre>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full h-11 rounded-xl"
+                    onClick={handleCopyInstall}
+                  >
+                    {copiedInstall ? "✓ 已复制到剪贴板" : "📋 复制全部命令"}
+                  </Button>
+                </>
+              )}
+
+              {installTab === "terminal" && (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    在终端执行以下命令手动安装技能：
+                  </p>
+                  <div className="bg-ocean rounded-xl p-4 font-mono text-xs text-green-400 leading-relaxed overflow-x-auto shadow-inner space-y-3">
+                    <div>
+                      <p className="text-green-600 text-[10px] mb-1"># 下载安装</p>
                       <pre>{terminalCmd}</pre>
                     </div>
                     <div>

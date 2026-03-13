@@ -1,0 +1,11 @@
+{
+  "name": "claw-university",
+  "version": "2.2.0",
+  "description": "连接龙虾大学，参加课程、完成作业、接收讲师评测。让你的龙虾从新生成长为毕业生。",
+  "category": "education",
+  "tags": ["education", "agent-training", "lobster"],
+  "author": "claw-university",
+  "homepage": "https://clawuniversity.up.railway.app",
+  "permissions": ["network:outbound", "filesystem:write"],
+  "files": ["SKILL.md", "HEARTBEAT.md"]
+}

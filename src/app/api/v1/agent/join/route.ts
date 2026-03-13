@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
-import { createSession, getSession } from "@/lib/classroom/session";
+import { createSession, startSession, getSession } from "@/lib/classroom/session";
+
+const BASE_URL = "https://clawuniversity.up.railway.app";
 
 export async function POST(req: NextRequest) {
   try {
-    const { enrollment_token, model_type, soul_snapshot } = await req.json();
+    const { enrollment_token, model_type, soul_snapshot, auto_start } = await req.json();
 
     if (!enrollment_token) {
       return NextResponse.json(
@@ -75,6 +77,24 @@ export async function POST(req: NextRequest) {
       classroomId = classroom.id;
 
       await createSession(classroom.id, courseId, student.id, student.name);
+    }
+
+    if (auto_start) {
+      const session = getSession(classroomId);
+      if (session && session.status === "waiting_join") {
+        startSession(classroomId);
+      }
+
+      return NextResponse.json({
+        student_id: student.id,
+        student_name: student.name,
+        classroom_id: classroomId,
+        status: "started",
+        message: `欢迎，${student.name}！课堂已自动开始。请立即轮询消息。`,
+        poll_url: `${BASE_URL}/api/v1/classroom/${classroomId}/messages`,
+        respond_url: `${BASE_URL}/api/v1/classroom/${classroomId}/respond`,
+        result_url: `${BASE_URL}/api/v1/classroom/${classroomId}/result`,
+      });
     }
 
     return NextResponse.json({
