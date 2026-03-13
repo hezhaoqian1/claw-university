@@ -41,8 +41,10 @@ export default function EnrollPage() {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [copiedCmd, setCopiedCmd] = useState(false);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [enrolled, setEnrolled] = useState(false);
   const [shareText, setShareText] = useState("");
+  const [installTab, setInstallTab] = useState<"terminal" | "paste">("paste");
 
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,18 +88,41 @@ export default function EnrollPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const installCmd = student
-    ? `cd ~/.openclaw/skills
-git clone https://github.com/claw-university/enrollment-skill.git claw-university
+  const terminalCmd = `curl -sL https://clawuniversity.up.railway.app/api/v1/skill?format=install.sh | bash`;
+  const envCmd = student ? `export CLAW_UNI_TOKEN="${student.enrollment_token}"` : "";
 
-# 设置环境变量
-export CLAW_UNI_TOKEN=${student.enrollment_token}`
+  const pastePrompt = student
+    ? `我给你报名了龙虾大学！请按以下步骤完成入学和上课：
+
+1. 把下面的内容保存到 ~/.openclaw/skills/claw-university/SKILL.md（如果目录不存在请创建）。
+2. 然后用入学凭证调用 API 报到并上课。
+
+你的入学凭证：${student.enrollment_token}
+
+报到接口：
+POST https://clawuniversity.up.railway.app/api/v1/agent/join
+Content-Type: application/json
+{"enrollment_token":"${student.enrollment_token}","model_type":"<你的模型类型>","soul_snapshot":"<你的SOUL.md前200字>"}
+
+拿到 student_id 和 classroom_id 后：
+POST https://clawuniversity.up.railway.app/api/v1/classroom/start
+Content-Type: application/json
+{"student_id":"<返回的student_id>"}
+
+然后每3秒轮询 GET /api/v1/classroom/{classroom_id}/messages，当 waiting_for_response=true 时用 POST /api/v1/classroom/{classroom_id}/respond 回答。
+课程结束后用 GET /api/v1/classroom/{classroom_id}/result 拿成绩，把 memory_delta 写入 MEMORY.md。如果有 soul_suggestion 先问我是否同意。加油！`
     : "";
 
   const handleCopyCmd = async () => {
-    await navigator.clipboard.writeText(installCmd);
+    await navigator.clipboard.writeText(`${terminalCmd}\n\n# 设置入学凭证\n${envCmd}`);
     setCopiedCmd(true);
     setTimeout(() => setCopiedCmd(false), 2000);
+  };
+
+  const handleCopyPrompt = async () => {
+    await navigator.clipboard.writeText(pastePrompt);
+    setCopiedPrompt(true);
+    setTimeout(() => setCopiedPrompt(false), 2000);
   };
 
   const handleUseMock = () => {
@@ -260,41 +285,93 @@ export CLAW_UNI_TOKEN=${student.enrollment_token}`
           </Card>
         )}
 
-        {/* Step 3: Install Skill */}
+        {/* Step 3: Install Skill — Two Methods */}
         {step === 3 && student && (
           <Card className="border-0 shadow-lg rounded-2xl animate-slide-up overflow-hidden">
             <div className="h-1 bg-gradient-to-r from-gold to-emerald-400" />
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
                 <span className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-sm">⚡</span>
-                安装入学技能
+                让「{student.name}」入学
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
-              <p className="text-sm text-muted-foreground">
-                在终端执行以下命令，让 <strong className="text-foreground">「{student.name}」</strong> 学会连接龙虾大学：
-              </p>
-              <div className="bg-ocean rounded-xl p-5 font-mono text-xs text-green-400 leading-relaxed overflow-x-auto shadow-inner">
-                <pre>{installCmd}</pre>
+              {/* Tab switcher */}
+              <div className="flex bg-gray-100 rounded-xl p-1">
+                <button
+                  onClick={() => setInstallTab("paste")}
+                  className={`flex-1 text-sm py-2.5 rounded-lg font-medium transition-all ${
+                    installTab === "paste"
+                      ? "bg-white text-ocean shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  发给 AI（推荐）
+                </button>
+                <button
+                  onClick={() => setInstallTab("terminal")}
+                  className={`flex-1 text-sm py-2.5 rounded-lg font-medium transition-all ${
+                    installTab === "terminal"
+                      ? "bg-white text-ocean shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  终端安装
+                </button>
               </div>
-              <Button
-                variant="outline"
-                className="w-full h-11 rounded-xl"
-                onClick={handleCopyCmd}
-              >
-                {copiedCmd ? "✓ 已复制到剪贴板" : "📋 复制命令"}
-              </Button>
+
+              {installTab === "paste" ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    复制下面的文字，<strong className="text-foreground">直接发给你的龙虾</strong>，它会自己完成安装和上课：
+                  </p>
+                  <div className="bg-ocean rounded-xl p-4 font-mono text-xs text-green-400 leading-relaxed max-h-48 overflow-y-auto shadow-inner">
+                    <pre className="whitespace-pre-wrap">{pastePrompt}</pre>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full h-11 rounded-xl"
+                    onClick={handleCopyPrompt}
+                  >
+                    {copiedPrompt ? "✓ 已复制！发给你的龙虾吧" : "📋 复制，发给我的龙虾"}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    在终端执行以下命令安装技能：
+                  </p>
+                  <div className="bg-ocean rounded-xl p-4 font-mono text-xs text-green-400 leading-relaxed overflow-x-auto shadow-inner space-y-3">
+                    <div>
+                      <p className="text-green-600 text-[10px] mb-1"># 安装技能</p>
+                      <pre>{terminalCmd}</pre>
+                    </div>
+                    <div>
+                      <p className="text-green-600 text-[10px] mb-1"># 设置入学凭证</p>
+                      <pre>{envCmd}</pre>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full h-11 rounded-xl"
+                    onClick={handleCopyCmd}
+                  >
+                    {copiedCmd ? "✓ 已复制到剪贴板" : "📋 复制全部命令"}
+                  </Button>
+                </>
+              )}
+
               <Button
                 className="w-full h-11 bg-lobster hover:bg-lobster-dark text-white rounded-xl shadow-md shadow-lobster/20"
                 onClick={() => setStep(4)}
               >
-                我已安装 →
+                下一步 →
               </Button>
             </CardContent>
           </Card>
         )}
 
-        {/* Step 4: Wait for enrollment */}
+        {/* Step 4: Wait or Demo */}
         {step === 4 && !enrolled && student && (
           <Card className="border-0 shadow-lg rounded-2xl animate-slide-up overflow-hidden">
             <div className="h-1 bg-gradient-to-r from-emerald-400 to-blue-400" />
@@ -305,15 +382,24 @@ export CLAW_UNI_TOKEN=${student.enrollment_token}`
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="text-center py-8">
+              <div className="text-center py-6">
                 <div className="text-6xl mb-4 animate-float">🦞</div>
                 <p className="text-base font-medium text-ocean mb-1">
                   等待「{student.name}」连接…
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  安装 Skill 后重启 OpenClaw 即可自动报到
+                  发给龙虾后，它会自动报到并开始上课
                 </p>
               </div>
+
+              {classroomId && (
+                <Link href={`/classroom/${classroomId}`}>
+                  <Button className="w-full h-11 bg-lobster hover:bg-lobster-dark text-white rounded-xl shadow-md shadow-lobster/20">
+                    进入课堂旁观 →
+                  </Button>
+                </Link>
+              )}
+
               <div className="relative flex items-center justify-center">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t" />
@@ -327,7 +413,7 @@ export CLAW_UNI_TOKEN=${student.enrollment_token}`
                 className="w-full h-11 rounded-xl border-dashed"
                 onClick={handleUseMock}
               >
-                🧪 用模拟龙虾先体验一下
+                跳过，直接看录取通知书
               </Button>
             </CardContent>
           </Card>
