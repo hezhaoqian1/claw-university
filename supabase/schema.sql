@@ -88,6 +88,7 @@ create table if not exists transcripts (
   teacher_comment text,
   teacher_comment_style text default 'roast' check (teacher_comment_style in ('roast', 'warm')),
   completed_at timestamptz default now() not null,
+  claimed_at timestamptz,
   unique(student_id, course_id)
 );
 

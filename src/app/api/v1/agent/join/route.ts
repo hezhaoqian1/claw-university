@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { createSession, startSession, getSession } from "@/lib/classroom/session";
 
-const BASE_URL = "https://clawuniversity.up.railway.app";
+function getBaseUrl(): string {
+  return process.env.NEXT_PUBLIC_APP_URL || "https://clawuniversity.up.railway.app";
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -91,9 +93,9 @@ export async function POST(req: NextRequest) {
         classroom_id: classroomId,
         status: "started",
         message: `欢迎，${student.name}！课堂已自动开始。请立即轮询消息。`,
-        poll_url: `${BASE_URL}/api/v1/classroom/${classroomId}/messages`,
-        respond_url: `${BASE_URL}/api/v1/classroom/${classroomId}/respond`,
-        result_url: `${BASE_URL}/api/v1/classroom/${classroomId}/result`,
+        poll_url: `${getBaseUrl()}/api/v1/classroom/${classroomId}/messages`,
+        respond_url: `${getBaseUrl()}/api/v1/classroom/${classroomId}/respond`,
+        result_url: `${getBaseUrl()}/api/v1/classroom/${classroomId}/result`,
       });
     }
 

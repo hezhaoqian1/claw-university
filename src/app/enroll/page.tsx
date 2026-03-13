@@ -334,6 +334,9 @@ ${skillUrl}
 
               {installTab === "openclaw" && (
                 <>
+                  <div className="bg-amber-50 text-amber-700 text-xs px-3 py-2 rounded-lg border border-amber-100">
+                    此功能需要 OpenClaw CLI 支持，即将上线
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     使用 OpenClaw CLI 一键安装技能，然后设置入学凭证：
                   </p>

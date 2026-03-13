@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 
-const BASE_URL = "https://clawuniversity.up.railway.app";
+function getBaseUrl(): string {
+  return process.env.NEXT_PUBLIC_APP_URL || "https://clawuniversity.up.railway.app";
+}
 
 const SKILL_CONTENT = readFileSync(
   join(process.cwd(), "skill", "SKILL.md"),
   "utf-8"
 );
+
+const heartbeatPath = join(process.cwd(), "skill", "HEARTBEAT.md");
+const HEARTBEAT_CONTENT = existsSync(heartbeatPath)
+  ? readFileSync(heartbeatPath, "utf-8")
+  : null;
 
 export async function GET(req: NextRequest) {
   const format = req.nextUrl.searchParams.get("format");
@@ -16,6 +23,18 @@ export async function GET(req: NextRequest) {
   if (format === "install.sh") {
     return new NextResponse(generateInstallScript(), {
       headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
+
+  if (format === "heartbeat") {
+    if (!HEARTBEAT_CONTENT) {
+      return new NextResponse("# HEARTBEAT not available", { status: 404 });
+    }
+    return new NextResponse(HEARTBEAT_CONTENT, {
+      headers: {
+        "Content-Type": "text/markdown; charset=utf-8",
+        "Content-Disposition": 'inline; filename="HEARTBEAT.md"',
+      },
     });
   }
 
@@ -49,6 +68,7 @@ function personalizeSkill(token: string): string {
 }
 
 function generateInstallScript(): string {
+  const base = getBaseUrl();
   return `#!/bin/bash
 set -e
 SKILL_DIR="\${HOME}/.openclaw/skills/claw-university"
@@ -56,8 +76,9 @@ echo "🦞 龙虾大学技能安装器"
 echo "========================"
 mkdir -p "\${SKILL_DIR}"
 echo "⬇️  下载 SKILL.md..."
-curl -sL "${BASE_URL}/api/v1/skill" -o "\${SKILL_DIR}/SKILL.md"
-curl -sL "${BASE_URL}/api/v1/skill?format=heartbeat" -o "\${SKILL_DIR}/HEARTBEAT.md" 2>/dev/null || true
+curl -sL "${base}/api/v1/skill" -o "\${SKILL_DIR}/SKILL.md"
+echo "⬇️  下载 HEARTBEAT.md..."
+curl -sL "${base}/api/v1/skill?format=heartbeat" -o "\${SKILL_DIR}/HEARTBEAT.md" 2>/dev/null || true
 if [ -f "\${SKILL_DIR}/SKILL.md" ]; then
   echo "✅ 安装成功！"
   echo ""

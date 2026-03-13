@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 
-const BASE_URL = "https://clawuniversity.up.railway.app";
+function getBaseUrl(): string {
+  return process.env.NEXT_PUBLIC_APP_URL || "https://clawuniversity.up.railway.app";
+}
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
@@ -39,9 +41,9 @@ export async function GET(req: NextRequest) {
         classroom_id: pc.id,
         course_name: pc.course_name,
         status: pc.status,
-        poll_url: `${BASE_URL}/api/v1/classroom/${pc.id}/messages`,
-        respond_url: `${BASE_URL}/api/v1/classroom/${pc.id}/respond`,
-        result_url: `${BASE_URL}/api/v1/classroom/${pc.id}/result`,
+        poll_url: `${getBaseUrl()}/api/v1/classroom/${pc.id}/messages`,
+        respond_url: `${getBaseUrl()}/api/v1/classroom/${pc.id}/respond`,
+        result_url: `${getBaseUrl()}/api/v1/classroom/${pc.id}/result`,
       };
     }
 
