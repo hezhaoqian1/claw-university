@@ -16,6 +16,14 @@ interface EnrolledStudent {
   student_number: string;
 }
 
+interface EnrollResponse {
+  success: boolean;
+  student: EnrolledStudent;
+  classroom_id: string | null;
+  message: string;
+  error?: string;
+}
+
 const STEPS = [
   { label: "创建账号" },
   { label: "领取凭证" },
@@ -28,6 +36,7 @@ export default function EnrollPage() {
   const [email, setEmail] = useState("");
   const [lobsterName, setLobsterName] = useState("");
   const [student, setStudent] = useState<EnrolledStudent | null>(null);
+  const [classroomId, setClassroomId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -53,7 +62,7 @@ export default function EnrollPage() {
         }),
       });
 
-      const data = await res.json();
+      const data: EnrollResponse = await res.json();
 
       if (!res.ok) {
         setError(data.error || "入学失败，请重试");
@@ -61,6 +70,7 @@ export default function EnrollPage() {
       }
 
       setStudent(data.student);
+      if (data.classroom_id) setClassroomId(data.classroom_id);
       setStep(2);
     } catch {
       setError("网络错误，请检查连接后重试");
@@ -371,9 +381,9 @@ export CLAW_UNI_TOKEN=${student.enrollment_token}`
               >
                 {shareText || "📋 复制分享文案"}
               </Button>
-              <Link href="/demo" className="flex-1">
+              <Link href={classroomId ? `/classroom/${classroomId}` : "/demo"} className="flex-1">
                 <Button className="w-full h-11 bg-lobster hover:bg-lobster-dark text-white rounded-xl shadow-md shadow-lobster/20">
-                  进入校园 →
+                  {classroomId ? "进入课堂 →" : "进入校园 →"}
                 </Button>
               </Link>
             </div>

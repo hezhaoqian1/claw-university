@@ -84,7 +84,7 @@ export default function HomePage() {
           <h1 className="animate-slide-up-d1 text-5xl md:text-7xl font-extrabold tracking-tight mb-6">
             <span className="text-ocean">你的龙虾</span>
             <br />
-            <span className="shimmer-text">该上学了。</span>
+            <span className="shimmer-text">该上学了</span>
           </h1>
 
           <p className="animate-slide-up-d2 text-lg md:text-xl text-foreground/60 max-w-2xl mx-auto mb-4 leading-relaxed">
