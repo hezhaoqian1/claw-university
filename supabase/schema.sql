@@ -1,19 +1,26 @@
 -- CLAW University Database Schema
--- Run this in Supabase SQL Editor to set up the database
+-- PostgreSQL (Railway)
 
--- Students table
+-- Users table (platform accounts)
+create table if not exists users (
+  id uuid default gen_random_uuid() primary key,
+  email text unique not null,
+  created_at timestamptz default now() not null
+);
+
+-- Students table (the lobsters)
 create table if not exists students (
   id uuid default gen_random_uuid() primary key,
   name text not null,
   avatar_url text,
   model_type text not null default 'unknown',
   enrollment_token text unique not null,
-  owner_user_id uuid references auth.users(id),
-  source text not null check (source in ('external_openclaw', 'hosted', 'mock')),
+  owner_id uuid references users(id),
+  source text not null default 'mock' check (source in ('external_openclaw', 'hosted', 'mock')),
   soul_snapshot text,
   current_grade text not null default 'freshman' check (current_grade in ('freshman', 'sophomore', 'junior', 'senior', 'graduate')),
   total_credits integer not null default 0,
-  student_number serial,
+  student_number text unique not null,
   created_at timestamptz default now() not null
 );
 
@@ -84,49 +91,14 @@ create table if not exists transcripts (
   unique(student_id, course_id)
 );
 
--- Indexes for performance
-create index if not exists idx_students_owner on students(owner_user_id);
+-- Indexes
+create index if not exists idx_students_owner on students(owner_id);
 create index if not exists idx_students_token on students(enrollment_token);
+create index if not exists idx_students_number on students(student_number);
 create index if not exists idx_classroom_messages_classroom on classroom_messages(classroom_id);
 create index if not exists idx_classroom_messages_time on classroom_messages(classroom_id, created_at);
 create index if not exists idx_submissions_student on submissions(student_id);
 create index if not exists idx_transcripts_student on transcripts(student_id);
 
--- Row Level Security
-alter table students enable row level security;
-alter table courses enable row level security;
-alter table classrooms enable row level security;
-alter table classroom_messages enable row level security;
-alter table submissions enable row level security;
-alter table transcripts enable row level security;
-
--- Courses are publicly readable
-create policy "courses_public_read" on courses for select using (true);
-
--- Classrooms are publicly readable
-create policy "classrooms_public_read" on classrooms for select using (true);
-
--- Classroom messages are publicly readable (for demo + spectator mode)
-create policy "messages_public_read" on classroom_messages for select using (true);
-
--- Messages can be inserted by service role (server-side only)
-create policy "messages_service_insert" on classroom_messages for insert
-  with check (true);
-
--- Students can view their own record
-create policy "students_own_read" on students for select
-  using (auth.uid() = owner_user_id);
-
--- Students can be created by authenticated users
-create policy "students_auth_insert" on students for insert
-  with check (auth.uid() = owner_user_id);
-
--- Submissions are readable by student owner
-create policy "submissions_own_read" on submissions for select
-  using (student_id in (select id from students where owner_user_id = auth.uid()));
-
--- Transcripts are publicly readable (for share pages)
-create policy "transcripts_public_read" on transcripts for select using (true);
-
--- Allow service role full access for server-side operations
--- (Supabase service_role key bypasses RLS by default)
+-- Sequence for student numbers (CU-2026-00001 format)
+create sequence if not exists student_number_seq start 1;

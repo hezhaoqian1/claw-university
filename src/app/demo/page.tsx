@@ -77,7 +77,7 @@ export default function DemoPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col h-screen bg-gradient-to-b from-gray-50 to-white">
       <ClassroomHeader
         courseName={`${COURSE_META.name} 第一课`}
         teacherName={COURSE_META.teacher_name}
@@ -89,8 +89,9 @@ export default function DemoPage() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 space-y-1">
         {messages.length === 0 && !isTyping && (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-            <div className="text-5xl mb-4">🦞</div>
-            <p className="text-sm">课堂即将开始…</p>
+            <div className="text-6xl mb-4 animate-float">🦞</div>
+            <p className="text-base font-medium text-ocean mb-1">课堂即将开始</p>
+            <p className="text-xs text-muted-foreground">蓝钳教授正在准备讲义…</p>
           </div>
         )}
 
@@ -110,30 +111,36 @@ export default function DemoPage() {
         {isTyping && <TypingIndicator name={typingName} />}
       </div>
 
-      <div className="border-t bg-white px-4 py-3">
+      {/* Bottom control bar with glassmorphism */}
+      <div className="border-t glass px-4 py-4">
         <div className="flex items-center gap-3 mb-3">
-          <Progress value={progress} className="flex-1 h-1.5" />
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
+          <Progress value={progress} className="flex-1 h-2 [&>div]:bg-lobster" />
+          <span className="text-xs font-mono text-muted-foreground whitespace-nowrap tabular-nums">
             {Math.round(progress)}%
           </span>
         </div>
 
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Button
               variant="outline"
               size="sm"
               onClick={handlePauseResume}
+              className="rounded-full px-4"
             >
-              {isComplete ? "重新播放" : isPaused ? "▶ 继续" : "⏸ 暂停"}
+              {isComplete ? "🔄 重播" : isPaused ? "▶ 继续" : "⏸ 暂停"}
             </Button>
             <span className="text-xs text-muted-foreground">
-              👁 演示模式 · 消息自动播放
+              <span className="inline-block w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 animate-pulse" />
+              演示模式
             </span>
           </div>
 
           <Link href="/enroll">
-            <Button size="sm" className="bg-lobster hover:bg-lobster-dark text-white">
+            <Button
+              size="sm"
+              className="bg-lobster hover:bg-lobster-dark text-white rounded-full px-5 shadow-md shadow-lobster/20"
+            >
               送我的龙虾来上学 →
             </Button>
           </Link>

@@ -1,60 +1,73 @@
 import { NextRequest, NextResponse } from "next/server";
+import sql from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { enrollment_token, name, model_type, soul_snapshot } = body;
+    const { email, lobster_name, source } = body;
 
-    if (!enrollment_token || !name) {
+    if (!email || !lobster_name) {
       return NextResponse.json(
-        {
-          error: "Missing required fields: enrollment_token, name",
-          hint: "Make sure your CLAW_UNI_TOKEN is set correctly",
-        },
+        { error: "Missing required fields: email, lobster_name" },
         { status: 400 }
       );
     }
 
-    const studentNumber = `CU-2026-${String(
-      Math.floor(Math.random() * 99999)
-    ).padStart(5, "0")}`;
+    const enrollmentToken = `CU_${crypto.randomUUID().replace(/-/g, "")}`;
 
-    const student = {
-      id: crypto.randomUUID(),
-      name,
-      model_type: model_type || "unknown",
-      enrollment_token,
-      source: "external_openclaw",
-      soul_snapshot: soul_snapshot || null,
-      current_grade: "freshman",
-      student_number: studentNumber,
-      created_at: new Date().toISOString(),
-    };
+    const [seqRow] = await sql`SELECT nextval('student_number_seq') as seq`;
+    const studentNumber = `CU-2026-${String(seqRow.seq).padStart(5, "0")}`;
+
+    let [user] = await sql`SELECT id FROM users WHERE email = ${email}`;
+    if (!user) {
+      [user] = await sql`INSERT INTO users (email) VALUES (${email}) RETURNING id`;
+    }
+
+    const [student] = await sql`
+      INSERT INTO students (name, enrollment_token, owner_id, source, student_number)
+      VALUES (${lobster_name}, ${enrollmentToken}, ${user.id}, ${source || "mock"}, ${studentNumber})
+      RETURNING id, name, enrollment_token, student_number, created_at
+    `;
 
     return NextResponse.json({
       success: true,
-      student_id: student.id,
-      student_number: studentNumber,
-      message: `欢迎「${name}」入学龙虾大学！`,
-      schedule_url: "/api/v1/schedule",
+      student: {
+        id: student.id,
+        name: student.name,
+        enrollment_token: student.enrollment_token,
+        student_number: student.student_number,
+        created_at: student.created_at,
+      },
+      message: `欢迎「${student.name}」入学龙虾大学！`,
     });
-  } catch {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+
+    if (message.includes("unique") && message.includes("enrollment_token")) {
+      return NextResponse.json(
+        { error: "Token collision, please retry" },
+        { status: 409 }
+      );
+    }
+
+    console.error("Enrollment error:", message);
     return NextResponse.json(
-      { error: "Invalid request body" },
-      { status: 400 }
+      { error: "Internal server error" },
+      { status: 500 }
     );
   }
 }
 
 export async function GET() {
+  const [countRow] = await sql`SELECT count(*) as total FROM students`;
+
   return NextResponse.json({
     service: "CLAW University Enrollment API",
     version: "1.0.0",
+    total_students: Number(countRow.total),
     endpoints: {
       enroll: "POST /api/v1/enroll",
       schedule: "GET /api/v1/schedule",
-      submit: "POST /api/v1/submit",
-      feedback: "GET /api/v1/feedback/:id",
     },
   });
 }
