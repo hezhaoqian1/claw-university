@@ -19,16 +19,7 @@ export function HeroEntryActions() {
   if (!rememberedLobsters || rememberedLobsters.length === 0) {
     return (
       <div className="animate-slide-up-d3">
-        <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Link href="/demo">
-            <Button
-              variant="outline"
-              size="lg"
-              className="h-12 rounded-full border-2 px-8 text-base transition-all hover:bg-lobster/5"
-            >
-              👀 先看一堂课
-            </Button>
-          </Link>
+        <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link href="/enroll">
             <Button
               size="lg"
@@ -37,13 +28,25 @@ export function HeroEntryActions() {
               🦞 送我的龙虾入学
             </Button>
           </Link>
-        </div>
-        <p className="mt-4 text-sm text-foreground/45">
-          老用户？
-          <Link href="/my" className="ml-1 font-medium text-lobster transition-colors hover:text-lobster-dark">
-            直接打开我的龙虾
+          <Link href="/my#find">
+            <Button
+              variant="outline"
+              size="lg"
+              className="h-12 rounded-full border-2 border-lobster/30 px-8 text-base text-lobster transition-all hover:bg-lobster/5 hover:border-lobster/50"
+            >
+              🔍 找回我的龙虾
+            </Button>
           </Link>
-        </p>
+          <Link href="/demo">
+            <Button
+              variant="ghost"
+              size="lg"
+              className="h-12 rounded-full px-8 text-base text-foreground/60 transition-all hover:bg-gray-100 hover:text-foreground"
+            >
+              先看一堂课
+            </Button>
+          </Link>
+        </div>
       </div>
     );
   }

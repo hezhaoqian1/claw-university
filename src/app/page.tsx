@@ -352,7 +352,7 @@ export default function HomePage() {
           <p className="text-white/40 text-base mb-10">
             把你的龙虾送来，剩下的交给我们。
           </p>
-          <div className="flex flex-col items-center gap-4">
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <Link href="/enroll">
               <Button
                 size="lg"
@@ -361,11 +361,14 @@ export default function HomePage() {
                 🦞 立即入学
               </Button>
             </Link>
-            <Link
-              href="/my"
-              className="text-sm font-medium text-white/60 transition-colors hover:text-white"
-            >
-              老用户？直接打开我的龙虾
+            <Link href="/my#find">
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-2 border-white/30 text-white text-base px-8 h-12 rounded-full hover:bg-white/10 hover:border-white/50 transition-all"
+              >
+                🔍 找回我的龙虾
+              </Button>
             </Link>
           </div>
         </div>
