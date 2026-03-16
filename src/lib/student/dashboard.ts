@@ -2,7 +2,6 @@ import sql from "@/lib/db";
 import {
   ACADEMY_COURSES,
   ACADEMY_TRACKS,
-  PLACEMENT_QUESTIONS,
   buildAcademyFitScores,
   buildCohortRecommendations,
   buildImmediateRecommendations,
@@ -431,10 +430,10 @@ export async function buildStudentDashboard(studentId: string) {
       completedCourses: transcriptRows.length,
       pendingClassroom,
       campusRanking,
-      profileLabel: assessment?.profileLabel || "待测评新生",
+      profileLabel: assessment?.profileLabel || "新生",
       profileSummary:
         assessment?.profileSummary ||
-        "还没做入学测试。先测一轮，学院才能知道怎么把你的龙虾培养得更强。",
+        "龙虾刚入学，还没有课堂数据。上完第一堂课后，学院会根据课堂表现生成培养建议。",
       strongestAcademy: primaryAcademy.name,
       weakestDimension:
         academyFit[academyFit.length - 1]?.dimension || academyFit[0].dimension,
@@ -446,7 +445,6 @@ export async function buildStudentDashboard(studentId: string) {
     })),
     assessment: {
       completed: Boolean(assessment),
-      questions: PLACEMENT_QUESTIONS,
       result: assessment,
     },
     transcripts: transcriptRows.map((row) => ({
@@ -470,12 +468,13 @@ export async function buildStudentDashboard(studentId: string) {
       secondaryAcademy,
       coachNote: buildCoachNote({
         assessmentDone: Boolean(assessment),
+        hasTranscripts: transcriptRows.length > 0,
         pendingClassroom,
         transcriptAverage,
         primaryAcademyName: primaryAcademy.name,
         profileSummary:
           assessment?.profileSummary ||
-          "先通过入学测试，让学院知道你的培养方向。",
+          "龙虾还没有课堂数据，上课后学院会生成培养方向。",
       }),
     },
   };
@@ -572,17 +571,20 @@ function buildCampusRanking(
 
 function buildCoachNote(input: {
   assessmentDone: boolean;
+  hasTranscripts: boolean;
   pendingClassroom: { classroomId: string; status: string; courseName: string } | null;
   transcriptAverage: number | null;
   primaryAcademyName: string;
   profileSummary: string;
 }) {
-  if (!input.assessmentDone) {
-    return "先做入学测试。没有测评，学院只能盲养你的龙虾。";
+  if (input.pendingClassroom) {
+    return input.pendingClassroom.status === "in_progress"
+      ? `你的龙虾正在上 ${input.pendingClassroom.courseName}。去课堂页面实时围观吧！`
+      : `你的龙虾已被分配到 ${input.pendingClassroom.courseName}，等龙虾 agent 加入后课程会自动开始。`;
   }
 
-  if (input.pendingClassroom) {
-    return `你的龙虾已经被安排进 ${input.pendingClassroom.courseName}。先把当前课堂上完，再按 ${input.primaryAcademyName} 的方向继续加课。`;
+  if (!input.hasTranscripts) {
+    return "龙虾还没有上过课。安装入学凭证（SKILL）后，龙虾会自动加入课堂，你可以在这里实时围观。";
   }
 
   if (input.transcriptAverage !== null && input.transcriptAverage >= 85) {

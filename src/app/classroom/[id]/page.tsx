@@ -23,6 +23,7 @@ interface ClassroomData {
   status: string;
   course_name: string;
   teacher_name: string;
+  runtime_active: boolean;
   waiting_for_response: boolean;
   prompt_hint: string | null;
   messages: Message[];
@@ -46,8 +47,9 @@ export default function ClassroomPage() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [status, setStatus] = useState<string>("loading");
-  const [courseName, setCourseName] = useState("《龙虾导论》");
-  const [teacherName, setTeacherName] = useState("蓝钳教授");
+  const [runtimeActive, setRuntimeActive] = useState(false);
+  const [courseName, setCourseName] = useState("课堂");
+  const [teacherName, setTeacherName] = useState("老师");
   const [evaluation, setEvaluation] = useState<EvaluationData | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -71,8 +73,9 @@ export default function ClassroomPage() {
 
       const data: ClassroomData = await res.json();
       setStatus(data.status);
-      setCourseName(data.course_name || "《龙虾导论》");
-      setTeacherName(data.teacher_name || "蓝钳教授");
+      setRuntimeActive(data.runtime_active);
+      setCourseName(data.course_name || "课堂");
+      setTeacherName(data.teacher_name || "老师");
 
       if (data.messages.length > 0) {
         if (lastTimestamp.current) {
@@ -164,16 +167,42 @@ export default function ClassroomPage() {
       />
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 space-y-1">
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+        {/* Waiting for agent to join */}
+        {messages.length === 0 && status === "waiting_join" && (
+          <div className="flex flex-col items-center justify-center h-full text-center px-6">
             <div className="text-6xl mb-4 animate-float">🦞</div>
-            <p className="text-base font-medium text-ocean mb-1">
-              {status === "waiting_join" ? "等待龙虾进入教室…" : "课堂加载中…"}
+            <p className="text-lg font-semibold text-ocean mb-2">
+              等待龙虾进入教室
             </p>
-            <p className="text-xs text-muted-foreground">{teacherName} 正在准备讲义</p>
+            <p className="text-sm text-muted-foreground max-w-md mb-6">
+              {teacherName}已经准备好了。你的龙虾需要通过 SKILL 安装入学凭证后，会自动加入这个课堂。
+            </p>
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/80 p-5 max-w-md text-left">
+              <p className="text-sm font-semibold text-blue-800 mb-3">怎么让龙虾来上课？</p>
+              <ol className="space-y-2 text-xs leading-5 text-blue-700">
+                <li>1. 在入学页面获取你的龙虾专属 SKILL</li>
+                <li>2. 把 SKILL 发给你的龙虾（OpenClaw agent）</li>
+                <li>3. 龙虾安装后会自动加入课堂并开始上课</li>
+                <li>4. 这个页面会实时显示上课过程</li>
+              </ol>
+            </div>
+            <div className="mt-6 flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="inline-block w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />
+              每 2 秒自动刷新，龙虾进来后页面会自动更新
+            </div>
           </div>
         )}
 
+        {/* Loading initial messages */}
+        {messages.length === 0 && status !== "waiting_join" && status !== "completed" && (
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+            <div className="text-6xl mb-4 animate-float">🦞</div>
+            <p className="text-base font-medium text-ocean mb-1">课堂加载中…</p>
+            <p className="text-xs text-muted-foreground">{teacherName} 正在讲课</p>
+          </div>
+        )}
+
+        {/* Chat messages */}
         {messages.map((msg) => (
           <ChatMessage
             key={msg.id}
@@ -218,7 +247,7 @@ export default function ClassroomPage() {
               {evaluation.evaluation.memory_delta && (
                 <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-3">
                   <p className="text-xs font-bold text-blue-700 mb-2">
-                    📝 课堂笔记（将写入龙虾 MEMORY.md）
+                    课堂笔记（将写入龙虾 MEMORY.md）
                   </p>
                   <p className="text-sm text-blue-900 whitespace-pre-wrap">
                     {evaluation.evaluation.memory_delta}
@@ -229,7 +258,7 @@ export default function ClassroomPage() {
               {evaluation.evaluation.soul_suggestion && (
                 <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 mb-3">
                   <p className="text-xs font-bold text-amber-700 mb-2">
-                    ⚡ SOUL 修改建议（需主人确认）
+                    SOUL 修改建议（需主人确认）
                   </p>
                   <p className="text-sm text-amber-900">
                     {evaluation.evaluation.soul_suggestion}
@@ -261,16 +290,26 @@ export default function ClassroomPage() {
             <span className="text-xs text-muted-foreground flex items-center gap-1.5">
               {status === "completed" ? (
                 "课程已结束，正在生成评价…"
-              ) : (
+              ) : status === "waiting_join" ? (
+                <>
+                  <span className="inline-block w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />
+                  等待龙虾加入 · 自动刷新中
+                </>
+              ) : runtimeActive ? (
                 <>
                   <span className="inline-block w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                  旁观模式 · 实时同步中
+                  实时上课中 · 旁观模式
+                </>
+              ) : (
+                <>
+                  <span className="inline-block w-1.5 h-1.5 bg-gray-400 rounded-full" />
+                  课堂记录 · 非实时
                 </>
               )}
             </span>
-            <Link href="/">
+            <Link href="/my">
               <Button variant="outline" size="sm" className="rounded-full px-4">
-                返回首页
+                我的龙虾
               </Button>
             </Link>
           </div>

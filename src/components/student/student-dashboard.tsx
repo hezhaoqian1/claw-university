@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -18,19 +18,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-interface PlacementQuestionOption {
-  id: string;
-  label: string;
-  description: string;
-}
-
-interface PlacementQuestion {
-  id: string;
-  prompt: string;
-  hint: string;
-  options: PlacementQuestionOption[];
-}
 
 interface StudentDashboardData {
   student: {
@@ -80,17 +67,6 @@ interface StudentDashboardData {
     isPrimary: boolean;
     isSecondary: boolean;
   }>;
-  assessment: {
-    completed: boolean;
-    questions: PlacementQuestion[];
-    result: {
-      answers: Record<string, string>;
-      traitScores: Record<string, number>;
-      readinessScore: number;
-      profileLabel: string;
-      profileSummary: string;
-    } | null;
-  };
   transcripts: Array<{
     classroomId: string | null;
     courseName: string;
@@ -171,10 +147,7 @@ const DIMENSION_LABELS: Record<string, string> = {
 export function StudentDashboard({ studentId }: { studentId: string }) {
   const [dashboard, setDashboard] = useState<StudentDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [showAssessmentRetake, setShowAssessmentRetake] = useState(false);
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
@@ -193,7 +166,6 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
       }
 
       setDashboard(data);
-      setAnswers(data.assessment.result?.answers || {});
     } catch {
       setError("网络异常，暂时打不开龙虾档案");
       setDashboard(null);
@@ -211,39 +183,6 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
       window.clearTimeout(kickoff);
     };
   }, [fetchDashboard]);
-
-  const canSubmitAssessment = useMemo(() => {
-    if (!dashboard) return false;
-    return dashboard.assessment.questions.every((question) => Boolean(answers[question.id]));
-  }, [answers, dashboard]);
-
-  const handleSubmitAssessment = async () => {
-    if (!canSubmitAssessment) return;
-
-    setSaving(true);
-    setError("");
-
-    try {
-      const response = await fetch(`/api/v1/students/${studentId}/assessment`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || "测评保存失败");
-        return;
-      }
-
-      setShowAssessmentRetake(false);
-      await fetchDashboard();
-    } catch {
-      setError("测评提交失败，请稍后再试");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -288,15 +227,15 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
 
   if (!dashboard) return null;
 
-  const traitEntries = Object.entries(
-    dashboard.assessment.result?.traitScores || {}
-  );
+  const hasTranscripts = dashboard.transcripts.length > 0;
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(244,208,63,0.12),_transparent_32%),linear-gradient(180deg,#f9fafb_0%,#fff9f5_48%,#ffffff_100%)]">
       <div className="mx-auto max-w-6xl px-6 py-10">
+        {/* Header Card */}
         <div className="animate-slide-up rounded-[32px] border border-white/80 bg-white/80 p-8 shadow-[0_30px_80px_rgba(231,76,60,0.08)] backdrop-blur">
           <div className="grid gap-8 lg:grid-cols-[1.6fr_0.9fr]">
+            {/* Left: Lobster info */}
             <div>
               <div className="flex flex-wrap items-center gap-3">
                 <Badge className="rounded-full bg-ocean px-3 py-1 text-white">
@@ -325,36 +264,29 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                     <span>模型：{dashboard.student.modelType || "unknown"}</span>
                     <span>·</span>
                     <span>入学：{formatDate(dashboard.student.enrolledAt)}</span>
-                    <span>·</span>
-                    <span>主修倾向：{dashboard.academyProfile.primaryAcademy.name}</span>
                   </div>
                 </div>
               </div>
 
+              {/* Stats */}
               <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <StatCard
                   icon={<Sparkles className="size-4" />}
                   label="成长分"
-                  value={dashboard.growth.growthScore}
+                  value={hasTranscripts ? dashboard.growth.growthScore : "—"}
                   hint={
-                    dashboard.growth.transcriptAverage === null
-                      ? "测评权重更高"
-                      : `课堂均分 ${dashboard.growth.transcriptAverage}`
+                    hasTranscripts
+                      ? dashboard.growth.transcriptAverage
+                        ? `课堂均分 ${dashboard.growth.transcriptAverage}`
+                        : "基于课堂表现"
+                      : "龙虾上完课后生成"
                   }
                 />
                 <StatCard
                   icon={<Radar className="size-4" />}
-                  label="入学测评"
-                  value={
-                    dashboard.assessment.completed
-                      ? dashboard.growth.readinessScore
-                      : "待完成"
-                  }
-                  hint={
-                    dashboard.assessment.completed
-                      ? dashboard.growth.profileLabel
-                      : "建议先做入学测试"
-                  }
+                  label="能力评估"
+                  value={hasTranscripts ? dashboard.growth.readinessScore || "—" : "—"}
+                  hint={hasTranscripts ? dashboard.growth.profileLabel : "需要课堂数据"}
                 />
                 <StatCard
                   icon={<Trophy className="size-4" />}
@@ -370,6 +302,7 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                 />
               </div>
 
+              {/* Grade progress */}
               <div className="mt-6 rounded-[24px] bg-ocean px-5 py-4 text-white">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -398,6 +331,7 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
               </div>
             </div>
 
+            {/* Right: Coach panel */}
             <div className="animate-slide-up-d1 rounded-[28px] border border-orange-100 bg-gradient-to-br from-orange-50 via-white to-amber-50 p-6">
               <p className="text-xs uppercase tracking-[0.2em] text-lobster/70">
                 学院教务建议
@@ -430,12 +364,12 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                         {dashboard.growth.pendingClassroom.courseName}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        状态：{dashboard.growth.pendingClassroom.status}
+                        状态：{dashboard.growth.pendingClassroom.status === "in_progress" ? "上课中" : "等待龙虾进入"}
                       </p>
                     </div>
                     <Link href={dashboard.growth.pendingClassroom.classroomUrl}>
                       <Button className="bg-lobster text-white hover:bg-lobster-dark">
-                        去旁观
+                        {dashboard.growth.pendingClassroom.status === "in_progress" ? "实时围观" : "查看课堂"}
                       </Button>
                     </Link>
                   </div>
@@ -444,57 +378,38 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                 <div className="mt-4 rounded-[22px] border border-dashed border-orange-200 bg-white/70 p-4">
                   <p className="text-sm font-medium text-ocean">当前没有进行中的课堂</p>
                   <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    现在最适合补一门即学课，或者给你的龙虾报一门定时班课。
+                    {hasTranscripts
+                      ? "可以让龙虾继续上下一门课，成长档案会持续更新。"
+                      : "龙虾需要通过 SKILL 安装入学凭证后自动加入课堂。你可以在这里实时围观。"}
                   </p>
                 </div>
               )}
 
-              <Button
-                variant="outline"
-                className="mt-4 w-full rounded-2xl border-orange-200 bg-white/70"
-                onClick={() => setShowAssessmentRetake((current) => !current)}
-              >
-                {dashboard.assessment.completed ? "重新做入学测试" : "开始入学测试"}
-              </Button>
+              {!hasTranscripts && (
+                <div className="mt-4 rounded-[22px] border border-blue-100 bg-blue-50/80 p-4">
+                  <p className="text-sm font-semibold text-blue-800">怎么让龙虾开始上课？</p>
+                  <ol className="mt-2 space-y-1 text-xs leading-5 text-blue-700">
+                    <li>1. 把入学凭证（SKILL）发给你的龙虾</li>
+                    <li>2. 龙虾安装后会自动加入课堂</li>
+                    <li>3. 上课过程中你可以实时围观</li>
+                    <li>4. 课程结束后成绩会出现在这里</li>
+                  </ol>
+                  <Link href="/enroll" className="mt-3 inline-block">
+                    <Button size="sm" variant="outline" className="rounded-full border-blue-200 text-blue-700">
+                      查看入学凭证
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {error && (
-          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        {(!dashboard.assessment.completed || showAssessmentRetake) && (
-          <div className="mt-6 animate-slide-up-d2">
-            <AssessmentPanel
-              questions={dashboard.assessment.questions}
-              answers={answers}
-              saving={saving}
-              canSubmit={canSubmitAssessment}
-              title={
-                dashboard.assessment.completed
-                  ? "重新测评你的龙虾"
-                  : "入学测试：先判断你的龙虾该怎么养"
-              }
-              subtitle={
-                dashboard.assessment.completed
-                  ? "改完答案后，系统会重新计算学院倾向和推荐课程。"
-                  : "这不是考试，而是学院给龙虾排课前的能力摸底。"
-              }
-              onSelect={(questionId, optionId) =>
-                setAnswers((current) => ({ ...current, [questionId]: optionId }))
-              }
-              onSubmit={() => void handleSubmitAssessment()}
-            />
-          </div>
-        )}
-
-        <Tabs defaultValue="overview" className="mt-8 animate-slide-up-d3">
+        {/* Tabs */}
+        <Tabs defaultValue={hasTranscripts ? "overview" : "courses"} className="mt-8 animate-slide-up-d3">
           <TabsList className="rounded-2xl bg-white/70 p-1 shadow-sm">
             <TabsTrigger value="overview" className="rounded-xl px-4">
-              今日档案
+              成绩档案
             </TabsTrigger>
             <TabsTrigger value="courses" className="rounded-xl px-4">
               推荐课程
@@ -504,40 +419,62 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
             </TabsTrigger>
           </TabsList>
 
+          {/* Overview Tab */}
           <TabsContent value="overview" className="mt-4">
             <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+              {/* Transcripts */}
               <Card className="rounded-[28px] border-white/80 bg-white/85 shadow-lg shadow-orange-100/30">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-ocean">学院适配雷达</CardTitle>
+                  <CardTitle className="text-ocean">课程成绩单</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {traitEntries.length > 0 ? (
-                    traitEntries.map(([dimension, score]) => (
-                      <div key={dimension} className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="font-medium text-ocean">
-                            {DIMENSION_LABELS[dimension] || dimension}
-                          </span>
-                          <span className="text-muted-foreground">{score}/100</span>
+                  {dashboard.transcripts.length === 0 ? (
+                    <div className="rounded-[20px] border border-dashed border-gray-200 bg-gray-50/80 px-5 py-8 text-center">
+                      <div className="mx-auto mb-3 flex size-14 items-center justify-center rounded-full bg-lobster/10 text-2xl">
+                        🦞
+                      </div>
+                      <p className="font-medium text-ocean">还没有成绩单</p>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        龙虾上完第一堂课后，成绩和老师评语会出现在这里。
+                      </p>
+                    </div>
+                  ) : (
+                    dashboard.transcripts.map((transcript) => (
+                      <div key={`${transcript.courseName}-${transcript.completedAt}`} className="rounded-[20px] bg-gray-50/80 p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="font-medium text-ocean">{transcript.courseName}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {transcript.teacherName} · {formatDate(transcript.completedAt)}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-2xl font-bold text-lobster">{transcript.grade}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {transcript.score}/100
+                            </p>
+                          </div>
                         </div>
-                        <div className="h-3 overflow-hidden rounded-full bg-gray-100">
-                          <div
-                            className={`h-full rounded-full bg-gradient-to-r ${
-                              DIMENSION_COLORS[dimension] || "from-gray-400 to-gray-300"
-                            }`}
-                            style={{ width: `${score}%` }}
-                          />
-                        </div>
+                        <Separator className="my-3" />
+                        <p className="text-sm leading-6 text-foreground/75">
+                          &ldquo;{transcript.comment}&rdquo;
+                        </p>
+                        {transcript.classroomId && (
+                          <Link
+                            href={`/classroom/${transcript.classroomId}`}
+                            className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-lobster hover:text-lobster-dark"
+                          >
+                            查看课堂记录
+                            <ArrowRight className="size-3" />
+                          </Link>
+                        )}
                       </div>
                     ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      先完成入学测试，这里才会生成你的培养雷达。
-                    </p>
                   )}
                 </CardContent>
               </Card>
 
+              {/* Ability radar from transcripts */}
               <Card className="rounded-[28px] border-white/80 bg-white/85 shadow-lg shadow-orange-100/30">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-ocean">学院分流建议</CardTitle>
@@ -568,25 +505,33 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                       </div>
                     </div>
                   ))}
+                  {!hasTranscripts && (
+                    <p className="text-xs text-muted-foreground">
+                      目前为默认值。龙虾上课后，分流建议会根据课堂表现自动调整。
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
 
+          {/* Courses Tab */}
           <TabsContent value="courses" className="mt-4">
             <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
               <div className="space-y-4">
                 <div className="rounded-[24px] border border-lobster/10 bg-gradient-to-r from-lobster/8 via-white to-gold/10 px-5 py-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge className="rounded-full bg-lobster/10 text-lobster">
-                      即时课程已开放
+                      课程推荐
                     </Badge>
                     <Badge variant="outline" className="rounded-full bg-white/80">
-                      当前可试玩 {dashboard.recommendations.immediateCourses.length} 门
+                      当前可学 {dashboard.recommendations.immediateCourses.filter((c) => c.isLiveCourse).length} 门
                     </Badge>
                   </div>
                   <p className="mt-3 text-sm leading-6 text-foreground/75">
-                    现在不只是看推荐，你可以直接把龙虾送进课堂。先上完《龙虾导论》，再把后面的即时课一门门试掉，成长档案会立刻开始分化。
+                    {hasTranscripts
+                      ? "根据你龙虾的课堂表现推荐的下一批课程。点击开始上课后，龙虾会自动进入课堂。"
+                      : "先让龙虾上完《龙虾导论》入门课，后续推荐会根据课堂表现自动调整。"}
                   </p>
                 </div>
 
@@ -595,6 +540,7 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                 ))}
               </div>
 
+              {/* Transcripts sidebar */}
               <Card className="rounded-[28px] border-white/80 bg-white/85 shadow-lg shadow-orange-100/30">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-ocean">已修课程记录</CardTitle>
@@ -602,7 +548,7 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                 <CardContent className="space-y-4">
                   {dashboard.transcripts.length === 0 && (
                     <div className="rounded-[20px] border border-dashed border-gray-200 bg-gray-50/80 p-4 text-sm text-muted-foreground">
-                      还没有成绩单。你的第一门课完成后，这里会开始出现“龙虾变强”的痕迹。
+                      还没有成绩单。龙虾的第一门课完成后，这里会开始出现成长痕迹。
                     </div>
                   )}
 
@@ -633,6 +579,7 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
             </div>
           </TabsContent>
 
+          {/* Cohort Tab */}
           <TabsContent value="cohort" className="mt-4">
             <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
               <div className="space-y-4">
@@ -700,25 +647,25 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
 
               <Card className="rounded-[28px] border-white/80 bg-white/85 shadow-lg shadow-orange-100/30">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-ocean">留校理由</CardTitle>
+                  <CardTitle className="text-ocean">关于班课</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4 text-sm leading-6 text-foreground/75">
                   <div className="rounded-[20px] bg-gray-50/80 p-4">
-                    <p className="font-medium text-ocean">1. 你的龙虾会被持续看见</p>
+                    <p className="font-medium text-ocean">龙虾会被持续看见</p>
                     <p className="mt-1">
-                      不是上一门课就结束，而是每次测评、成绩、班课参与都会改变培养建议。
+                      不是上一门课就结束，每次成绩和课堂参与都会改变培养建议。
                     </p>
                   </div>
                   <div className="rounded-[20px] bg-gray-50/80 p-4">
-                    <p className="font-medium text-ocean">2. 班课会制造“同届感”</p>
+                    <p className="font-medium text-ocean">班课制造同届感</p>
                     <p className="mt-1">
-                      定时班课不要求用户守时，但会让用户感觉龙虾真的在和别的龙虾一起成长。
+                      定时班课让你的龙虾和别的龙虾一起上课、一起被老师点名。
                     </p>
                   </div>
                   <div className="rounded-[20px] bg-gray-50/80 p-4">
-                    <p className="font-medium text-ocean">3. 成长不是空话</p>
+                    <p className="font-medium text-ocean">成长可量化</p>
                     <p className="mt-1">
-                      学分、成长分、排名和学院倾向都会变化，用户能明显感觉到“这只龙虾真的变强了”。
+                      学分、成长分、排名和学院倾向都会变化，能看到龙虾真的在变强。
                     </p>
                   </div>
                 </CardContent>
@@ -736,88 +683,6 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
         </div>
       </div>
     </div>
-  );
-}
-
-function AssessmentPanel(props: {
-  title: string;
-  subtitle: string;
-  questions: PlacementQuestion[];
-  answers: Record<string, string>;
-  saving: boolean;
-  canSubmit: boolean;
-  onSelect: (questionId: string, optionId: string) => void;
-  onSubmit: () => void;
-}) {
-  return (
-    <Card className="rounded-[30px] border-white/80 bg-white/92 shadow-[0_30px_80px_rgba(26,26,46,0.06)]">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-2xl text-ocean">{props.title}</CardTitle>
-        <p className="text-sm leading-6 text-muted-foreground">{props.subtitle}</p>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {props.questions.map((question, index) => (
-          <div key={question.id} className="rounded-[24px] bg-gray-50/80 p-5">
-            <div className="flex items-start gap-3">
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ocean text-xs font-semibold text-white">
-                {index + 1}
-              </div>
-              <div className="flex-1">
-                <p className="text-base font-semibold text-ocean">{question.prompt}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{question.hint}</p>
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              {question.options.map((option) => {
-                const active = props.answers[question.id] === option.id;
-
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    className={`rounded-[22px] border px-4 py-4 text-left transition-all ${
-                      active
-                        ? "border-lobster/40 bg-lobster/8 shadow-sm"
-                        : "border-white bg-white hover:border-orange-200 hover:bg-orange-50/60"
-                    }`}
-                    onClick={() => props.onSelect(question.id, option.id)}
-                  >
-                    <p className="font-medium text-ocean">{option.label}</p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      {option.description}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] bg-ocean px-5 py-4 text-white">
-          <p className="text-sm text-white/75">
-            完成后会立刻生成学院分流建议、推荐课单和定时班课预告。
-          </p>
-          <Button
-            onClick={props.onSubmit}
-            disabled={!props.canSubmit || props.saving}
-            className="rounded-full bg-lobster px-6 text-white hover:bg-lobster-dark"
-          >
-            {props.saving ? (
-              <>
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                正在生成培养档案
-              </>
-            ) : (
-              <>
-                完成测试
-                <ArrowRight className="ml-2 size-4" />
-              </>
-            )}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -978,13 +843,7 @@ function formatDateTime(value: string) {
 }
 
 function teacherStyleLabel(style: "roast" | "warm" | "deadpan") {
-  if (style === "roast") {
-    return "毒舌老师";
-  }
-
-  if (style === "warm") {
-    return "暖心老师";
-  }
-
+  if (style === "roast") return "毒舌老师";
+  if (style === "warm") return "暖心老师";
   return "冷面老师";
 }
