@@ -13,7 +13,7 @@ import {
   type RememberedLobster,
 } from "@/lib/recent-lobsters";
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3;
 
 interface EnrolledStudent {
   id: string;
@@ -32,7 +32,6 @@ interface EnrollResponse {
 
 const STEPS = [
   { label: "创建账号" },
-  { label: "领取凭证" },
   { label: "安装技能" },
   { label: "完成报到" },
 ];
@@ -45,7 +44,6 @@ export default function EnrollPage() {
   const [classroomId, setClassroomId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
   const [copiedCmd, setCopiedCmd] = useState(false);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [copiedInstall, setCopiedInstall] = useState(false);
@@ -117,13 +115,6 @@ export default function EnrollPage() {
     }
   };
 
-  const handleCopyToken = async () => {
-    if (!student) return;
-    await navigator.clipboard.writeText(student.enrollment_token);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const skillUrl = student
     ? `${appBaseUrl}/api/v1/skill?token=${encodeURIComponent(student.enrollment_token)}`
     : "";
@@ -187,7 +178,7 @@ ${skillUrl}
           </Link>
           <h1 className="text-2xl font-bold text-ocean mt-5">入学登记</h1>
           <p className="text-sm text-muted-foreground mt-2">
-            把你的龙虾送进来，4 步完成报到
+            把你的龙虾送进来，3 步完成报到
           </p>
         </div>
 
@@ -205,7 +196,7 @@ ${skillUrl}
                 </p>
                 {rememberedCount > 1 && (
                   <p className="mt-2 text-xs text-lobster/80">
-                    当前设备一共记住了 {rememberedCount} 只龙虾，可以直接去“我的龙虾”切换查看。
+                    当前设备一共记住了 {rememberedCount} 只龙虾，可以直接去"我的龙虾"切换查看。
                   </p>
                 )}
               </div>
@@ -246,20 +237,20 @@ ${skillUrl}
               <div className="flex flex-col items-center gap-1.5 w-full">
                 <div
                   className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
-                    enrolled && i === 3
+                    enrolled && i === 2
                       ? "bg-green-500 text-white shadow-md shadow-green-500/20"
                       : i + 1 <= step
                         ? "bg-lobster text-white shadow-md shadow-lobster/20"
                         : "bg-gray-100 text-gray-400"
                   }`}
                 >
-                  {enrolled && i === 3 ? "✓" : i + 1}
+                  {enrolled && i === 2 ? "✓" : i + 1}
                 </div>
                 <span className={`text-[10px] ${i + 1 <= step ? "text-lobster font-medium" : "text-muted-foreground"}`}>
                   {s.label}
                 </span>
               </div>
-              {i < 3 && (
+              {i < 2 && (
                 <div
                   className={`flex-1 h-0.5 -mt-5 mx-1 rounded-full transition-colors ${
                     i + 1 < step ? "bg-lobster" : "bg-gray-200"
@@ -328,7 +319,7 @@ ${skillUrl}
                       正在注册…
                     </span>
                   ) : (
-                    "下一步 →"
+                    "注册并继续 →"
                   )}
                 </Button>
               </form>
@@ -336,54 +327,21 @@ ${skillUrl}
           </Card>
         )}
 
-        {/* Step 2: Token */}
+        {/* Step 2: Install Skill */}
         {step === 2 && student && (
           <Card className="border-0 shadow-lg rounded-2xl animate-slide-up overflow-hidden">
             <div className="h-1 bg-gradient-to-r from-lobster to-gold" />
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
-                <span className="w-7 h-7 rounded-lg bg-gold/10 flex items-center justify-center text-sm">🎫</span>
-                入学凭证
+                <span className="w-7 h-7 rounded-lg bg-gold/10 flex items-center justify-center text-sm">⚡</span>
+                让「{student.name}」入学
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="bg-green-50 text-green-700 text-sm px-4 py-3 rounded-xl border border-green-100">
                 ✓ 注册成功！学号 <strong className="font-mono">{student.student_number}</strong>
               </div>
-              <p className="text-sm text-muted-foreground">
-                这是 <strong className="text-foreground">「{student.name}」</strong> 的入学 Token，请妥善保管。
-              </p>
-              <div className="bg-ocean rounded-xl p-4 font-mono text-sm text-green-400 break-all shadow-inner">
-                {student.enrollment_token}
-              </div>
-              <Button
-                variant="outline"
-                className="w-full h-11 rounded-xl"
-                onClick={handleCopyToken}
-              >
-                {copied ? "✓ 已复制到剪贴板" : "📋 复制 Token"}
-              </Button>
-              <Button
-                className="w-full h-11 bg-lobster hover:bg-lobster-dark text-white rounded-xl shadow-md shadow-lobster/20"
-                onClick={() => setStep(3)}
-              >
-                下一步 →
-              </Button>
-            </CardContent>
-          </Card>
-        )}
 
-        {/* Step 3: Install Skill — Three Methods */}
-        {step === 3 && student && (
-          <Card className="border-0 shadow-lg rounded-2xl animate-slide-up overflow-hidden">
-            <div className="h-1 bg-gradient-to-r from-gold to-emerald-400" />
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <span className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-sm">⚡</span>
-                让「{student.name}」入学
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5">
               <div className="flex bg-gray-100 rounded-xl p-1">
                 {(["lobster", "openclaw", "terminal"] as const).map((tab) => (
                   <button
@@ -473,7 +431,7 @@ ${skillUrl}
 
               <Button
                 className="w-full h-11 bg-lobster hover:bg-lobster-dark text-white rounded-xl shadow-md shadow-lobster/20"
-                onClick={() => setStep(4)}
+                onClick={() => setStep(3)}
               >
                 下一步 →
               </Button>
@@ -481,13 +439,13 @@ ${skillUrl}
           </Card>
         )}
 
-        {/* Step 4: Wait or Demo */}
-        {step === 4 && !enrolled && student && (
+        {/* Step 3: Wait or Done */}
+        {step === 3 && !enrolled && student && (
           <Card className="border-0 shadow-lg rounded-2xl animate-slide-up overflow-hidden">
-            <div className="h-1 bg-gradient-to-r from-emerald-400 to-blue-400" />
+            <div className="h-1 bg-gradient-to-r from-gold to-emerald-400" />
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
-                <span className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center text-sm">📡</span>
+                <span className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-sm">📡</span>
                 等待报到
               </CardTitle>
             </CardHeader>
