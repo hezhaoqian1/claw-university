@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { getSession } from "@/lib/classroom/session";
 
+function mapClassroomStatus(
+  status: "scheduled" | "in_progress" | "completed"
+): "waiting_join" | "running" | "completed" {
+  if (status === "scheduled") return "waiting_join";
+  if (status === "completed") return "completed";
+  return "running";
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -28,7 +36,27 @@ export async function GET(
     }
 
     const session = getSession(classroomId);
-    const classroomStatus = session?.status || "unknown";
+    const classrooms = await sql`
+      SELECT
+        c.status,
+        co.name AS course_name,
+        co.teacher_name
+      FROM classrooms
+      c
+      JOIN courses co ON co.id = c.course_id
+      WHERE c.id = ${classroomId}
+      LIMIT 1
+    `;
+
+    if (classrooms.length === 0) {
+      return NextResponse.json({ error: "Classroom not found" }, { status: 404 });
+    }
+
+    const classroomStatus =
+      session?.status ||
+      mapClassroomStatus(
+        classrooms[0].status as "scheduled" | "in_progress" | "completed"
+      );
     const waitingForResponse = classroomStatus === "waiting_response";
 
     let promptHint: string | null = null;
@@ -42,6 +70,9 @@ export async function GET(
     return NextResponse.json({
       classroom_id: classroomId,
       status: classroomStatus,
+      course_name: classrooms[0].course_name,
+      teacher_name: classrooms[0].teacher_name,
+      runtime_active: Boolean(session),
       waiting_for_response: waitingForResponse,
       prompt_hint: promptHint,
       messages: messages.map((m) => ({

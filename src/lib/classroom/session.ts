@@ -4,12 +4,19 @@ import {
   generateFinalEvaluation,
   type FinalEvaluation,
 } from "@/lib/llm";
-import { LECTURE_SCRIPT, RUBRIC, COURSE_META } from "@/lib/courses/lobster-101";
+import {
+  ensureClassroomDataModel,
+  markEnrollmentCompleted,
+  markEnrollmentJoined,
+  upsertClassroomEnrollment,
+} from "@/lib/classroom/ownership";
+import { getCourseRuntimeByKey } from "@/lib/courses/registry";
 import type { LectureStep } from "@/types";
 
 export interface ActiveSession {
   classroomId: string;
   courseId: string;
+  courseRuntimeKey: string;
   studentId: string;
   studentName: string;
   status: "waiting_join" | "running" | "waiting_response" | "evaluating" | "completed";
@@ -28,12 +35,17 @@ export function getSession(classroomId: string): ActiveSession | undefined {
 export async function createSession(
   classroomId: string,
   courseId: string,
+  courseRuntimeKey: string,
   studentId: string,
   studentName: string
 ): Promise<ActiveSession> {
+  await ensureClassroomDataModel();
+  await upsertClassroomEnrollment(classroomId, courseId, studentId);
+
   const session: ActiveSession = {
     classroomId,
     courseId,
+    courseRuntimeKey,
     studentId,
     studentName,
     status: "waiting_join",
@@ -53,6 +65,7 @@ export async function startSession(classroomId: string): Promise<void> {
   session.status = "running";
 
   await sql`UPDATE classrooms SET status = 'in_progress', started_at = now() WHERE id = ${classroomId}`;
+  await markEnrollmentJoined(classroomId, session.studentId);
 
   await insertSystemMessage(classroomId, `「${session.studentName}」进入教室`);
 
@@ -62,9 +75,10 @@ export async function startSession(classroomId: string): Promise<void> {
 async function driveLesson(classroomId: string): Promise<void> {
   const session = activeSessions.get(classroomId);
   if (!session || session.status === "completed") return;
+  const runtime = getCourseRuntimeByKey(session.courseRuntimeKey);
 
-  while (session.currentStepIndex < LECTURE_SCRIPT.length) {
-    const step = LECTURE_SCRIPT[session.currentStepIndex];
+  while (session.currentStepIndex < runtime.script.length) {
+    const step = runtime.script[session.currentStepIndex];
 
     const delay = step.delay_ms || 2000;
     await sleep(Math.min(delay, 3000));
@@ -119,6 +133,7 @@ export async function handleStudentResponse(
 ): Promise<void> {
   const session = activeSessions.get(classroomId);
   if (!session || session.status !== "waiting_response") return;
+  const runtime = getCourseRuntimeByKey(session.courseRuntimeKey);
 
   await insertStudentMessage(classroomId, session.studentId, session.studentName, content);
 
@@ -153,15 +168,17 @@ export async function handleStudentResponse(
       const answerIndex = parseQuizAnswer(content);
       const correct = answerIndex === step.quiz_answer;
       const feedback = correct
-        ? `回答正确。选 B 是对的——承认自己有不擅长的领域，比声称什么都会要专业得多。`
-        : `回答错误。正确答案是 B。声称自己什么都会的龙虾，是最不可信的。`;
+        ? `回答正确。你至少知道该往哪边走。`
+        : `回答错误。正确答案是 B。你还需要把课堂重点再捞一遍。`;
       await insertTeacherMessage(classroomId, feedback, "feedback");
     } else if (step.type === "exercise") {
-      const rubricText = RUBRIC.map(
+      const rubricText = runtime.rubric.map(
         (r) => `- ${r.name}（${r.max_score}分）：${r.description}`
       ).join("\n");
 
       const evaluation = await evaluateStudentResponse(
+        runtime.meta.teacher_name,
+        runtime.meta.teacher_style,
         session.studentName,
         content,
         step.exercise_prompt || step.content,
@@ -189,6 +206,7 @@ export async function handleStudentResponse(
 async function finishSession(classroomId: string): Promise<void> {
   const session = activeSessions.get(classroomId);
   if (!session) return;
+  const runtime = getCourseRuntimeByKey(session.courseRuntimeKey);
 
   session.status = "evaluating";
 
@@ -199,48 +217,76 @@ async function finishSession(classroomId: string): Promise<void> {
     .map((m) => `[${m.role}] ${m.agent_name}: ${m.content}`)
     .join("\n");
 
-  const rubricText = RUBRIC.map(
+  const rubricText = runtime.rubric.map(
     (r) => `- ${r.name}（${r.max_score}分）：${r.description}`
   ).join("\n");
 
+  let evaluation: FinalEvaluation;
+
   try {
-    const evaluation = await generateFinalEvaluation(
+    evaluation = await generateFinalEvaluation(
+      runtime.meta.teacher_name,
       session.studentName,
       messagesContext,
       rubricText,
-      `${COURSE_META.name} — ${COURSE_META.description}`,
-      COURSE_META.teacher_style
+      `${runtime.meta.name} — ${runtime.meta.description}`,
+      runtime.meta.teacher_style
     );
-
-    session.finalEvaluation = evaluation;
-
-    const courseRows = await sql`SELECT id FROM courses WHERE name = ${COURSE_META.name} LIMIT 1`;
-    const courseId = courseRows.length > 0 ? courseRows[0].id : session.courseId;
-
-    await sql`
-      INSERT INTO transcripts (student_id, course_id, final_score, grade, teacher_comment, teacher_comment_style)
-      VALUES (${session.studentId}, ${courseId}, ${evaluation.total_score}, ${evaluation.grade}, ${evaluation.comment}, ${evaluation.comment_style})
-      ON CONFLICT (student_id, course_id) DO UPDATE SET
-        final_score = EXCLUDED.final_score,
-        grade = EXCLUDED.grade,
-        teacher_comment = EXCLUDED.teacher_comment,
-        completed_at = now()
-    `;
   } catch (err) {
     console.error("Final evaluation failed:", err);
-    session.finalEvaluation = {
+    evaluation = {
       total_score: 65,
       grade: "D",
-      comment: "系统评价暂时不可用，给了一个保守的及格分。",
-      comment_style: "roast",
-      memory_delta: "- 今天在龙虾大学上了《龙虾导论》\n- 课程主题：如何做好自我介绍",
+      comment: "系统评价暂时不可用，先给你一个保守的及格分。",
+      comment_style: runtime.meta.teacher_style,
+      memory_delta: `- 今天上了 ${runtime.meta.name}\n- 课程主题：${runtime.meta.description}\n- 课堂结果需要稍后人工复核`,
       soul_suggestion: null,
     };
   }
 
+  session.finalEvaluation = evaluation;
+
+  await ensureClassroomDataModel();
+
+  await sql`
+    INSERT INTO transcripts (
+      student_id,
+      course_id,
+      classroom_id,
+      final_score,
+      grade,
+      teacher_comment,
+      teacher_comment_style,
+      memory_delta,
+      soul_suggestion
+    )
+    VALUES (
+      ${session.studentId},
+      ${session.courseId},
+      ${classroomId},
+      ${evaluation.total_score},
+      ${evaluation.grade},
+      ${evaluation.comment},
+      ${evaluation.comment_style},
+      ${evaluation.memory_delta},
+      ${evaluation.soul_suggestion}
+    )
+    ON CONFLICT (student_id, course_id) DO UPDATE SET
+      classroom_id = EXCLUDED.classroom_id,
+      final_score = EXCLUDED.final_score,
+      grade = EXCLUDED.grade,
+      teacher_comment = EXCLUDED.teacher_comment,
+      teacher_comment_style = EXCLUDED.teacher_comment_style,
+      memory_delta = EXCLUDED.memory_delta,
+      soul_suggestion = EXCLUDED.soul_suggestion,
+      claimed_at = NULL,
+      completed_at = now()
+  `;
+
   session.status = "completed";
 
   await sql`UPDATE classrooms SET status = 'completed', ended_at = now() WHERE id = ${classroomId}`;
+  await markEnrollmentCompleted(classroomId, session.studentId);
 
   await insertSystemMessage(classroomId, "课程结束");
 }
@@ -250,9 +296,14 @@ async function insertTeacherMessage(
   content: string,
   messageType: string
 ): Promise<void> {
+  const session = activeSessions.get(classroomId);
+  const teacherName = session
+    ? getCourseRuntimeByKey(session.courseRuntimeKey).meta.teacher_name
+    : "teacher";
+
   await sql`
     INSERT INTO classroom_messages (classroom_id, agent_name, role, content, message_type)
-    VALUES (${classroomId}, ${COURSE_META.teacher_name}, 'teacher', ${content}, ${messageType})
+    VALUES (${classroomId}, ${teacherName}, 'teacher', ${content}, ${messageType})
   `;
 }
 
@@ -279,6 +330,8 @@ function parseQuizAnswer(content: string): number {
   const upper = content.toUpperCase().trim();
   if (upper.includes("B") || upper.includes("2")) return 1;
   if (upper.includes("A") || upper.includes("1")) return 0;
+  if (upper.includes("C") || upper.includes("3")) return 2;
+  if (upper.includes("D") || upper.includes("4")) return 3;
   return -1;
 }
 

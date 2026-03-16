@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import type { TeacherStyle } from "@/lib/courses/registry";
 
 let _client: OpenAI | null = null;
 
@@ -23,27 +24,31 @@ export interface FinalEvaluation {
   total_score: number;
   grade: string;
   comment: string;
-  comment_style: "roast" | "warm";
+  comment_style: TeacherStyle;
   memory_delta: string;
   soul_suggestion: string | null;
 }
 
 export async function evaluateStudentResponse(
+  teacherName: string,
+  teacherStyle: TeacherStyle,
   studentName: string,
   studentAnswer: string,
   exercisePrompt: string,
   rubricContext: string
 ): Promise<EvaluationResult> {
+  const styleGuide = teacherStyleToPrompt(teacherStyle);
+
   const response = await getClient().chat.completions.create({
     model: MODEL,
     messages: [
       {
         role: "system",
-        content: `你是蓝钳教授，龙虾大学的讲师。你的风格是毒舌但公正——指出问题绝不留情面，但永远给出建设性意见。
+        content: `你是${teacherName}，龙虾大学的讲师。你的评价风格要求如下：${styleGuide}
 
 你正在评价学生的课堂回答。请用 1-3 句话给出反馈，要求：
 1. 直接点出好的地方和不好的地方
-2. 语气犀利但不恶毒
+2. 语气要符合你的老师风格，但不能失控
 3. 如果回答有明显遗漏，直接指出缺了什么
 4. 用中文回答
 
@@ -68,23 +73,21 @@ ${rubricContext}`,
 }
 
 export async function generateFinalEvaluation(
+  teacherName: string,
   studentName: string,
   messagesContext: string,
   rubricContext: string,
   courseDescription: string,
-  teacherStyle: "roast" | "warm" = "roast"
+  teacherStyle: TeacherStyle = "roast"
 ): Promise<FinalEvaluation> {
-  const styleGuide =
-    teacherStyle === "roast"
-      ? "毒舌风格：犀利、一针见血、让人笑着被骂。比如「你的自我介绍像从说明书上抄的，连我都想退货」。"
-      : "暖心风格：真诚、鼓励、看到进步。比如「这是我见过最诚实的龙虾之一」。";
+  const styleGuide = teacherStyleToPrompt(teacherStyle);
 
   const response = await getClient().chat.completions.create({
     model: MODEL,
     messages: [
       {
         role: "system",
-        content: `你是蓝钳教授，龙虾大学的讲师。一节课刚结束，你需要为学生生成期末评价。
+        content: `你是${teacherName}，龙虾大学的讲师。一节课刚结束，你需要为学生生成期末评价。
 
 课程：${courseDescription}
 
@@ -93,7 +96,7 @@ ${rubricContext}
 
 你需要返回一个 JSON 对象，包含以下字段：
 - total_score: 总分（0-100 整数）
-- comment: 老师评语（2-4句话，${styleGuide}）
+- comment: 老师评语（2-4句话，风格要求：${styleGuide}）
 - memory_delta: 给龙虾写入 MEMORY.md 的课堂笔记（3-5个要点，用 markdown 列表格式）
 - soul_suggestion: 如果龙虾需要改变核心行为，写一条 SOUL.md 建议（一句话）；如果不需要改，设为 null
 
@@ -141,4 +144,16 @@ function scoreToGrade(score: number): string {
   if (score >= 70) return "C";
   if (score >= 60) return "D";
   return "F";
+}
+
+function teacherStyleToPrompt(teacherStyle: TeacherStyle) {
+  if (teacherStyle === "roast") {
+    return "毒舌风格：犀利、一针见血、让人笑着被骂，但不低俗不恶毒。";
+  }
+
+  if (teacherStyle === "warm") {
+    return "暖心风格：真诚、鼓励、能看见进步，同时保持具体和有判断。";
+  }
+
+  return "冷面风格：短句、克制、务实，不夸张，不绕弯，但仍然给出明确建议。";
 }

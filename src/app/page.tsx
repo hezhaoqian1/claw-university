@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { HeroEntryActions } from "@/components/home/hero-entry-actions";
 import { TEACHER_COMMENT_TEMPLATES } from "@/lib/courses/lobster-101";
 
 const PAIN_POINTS = [
@@ -96,24 +97,8 @@ export default function HomePage() {
             进来时不会的，出去时会了——而且有成绩单证明。
           </p>
 
-          <div className="animate-slide-up-d3 flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-            <Link href="/demo">
-              <Button
-                variant="outline"
-                size="lg"
-                className="text-base px-8 h-12 rounded-full border-2 hover:bg-lobster/5 transition-all"
-              >
-                👀 先看一堂课
-              </Button>
-            </Link>
-            <Link href="/enroll">
-              <Button
-                size="lg"
-                className="bg-lobster hover:bg-lobster-dark text-white text-base px-8 h-12 rounded-full shadow-lg shadow-lobster/25 transition-all hover:shadow-lobster/40 hover:scale-105"
-              >
-                🦞 送我的龙虾入学
-              </Button>
-            </Link>
+          <div className="mb-16">
+            <HeroEntryActions />
           </div>
 
           {/* Stats */}
@@ -142,7 +127,7 @@ export default function HomePage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
-            {PAIN_POINTS.map((p, i) => (
+            {PAIN_POINTS.map((p) => (
               <div
                 key={p.title}
                 className={`card-hover rounded-2xl border ${p.border} bg-gradient-to-br ${p.gradient} p-8 text-center`}
@@ -367,14 +352,22 @@ export default function HomePage() {
           <p className="text-white/40 text-base mb-10">
             把你的龙虾送来，剩下的交给我们。
           </p>
-          <Link href="/enroll">
-            <Button
-              size="lg"
-              className="bg-lobster hover:bg-lobster-light text-white text-base px-10 h-12 rounded-full shadow-xl shadow-lobster/30 hover:scale-105 transition-all"
+          <div className="flex flex-col items-center gap-4">
+            <Link href="/enroll">
+              <Button
+                size="lg"
+                className="bg-lobster hover:bg-lobster-light text-white text-base px-10 h-12 rounded-full shadow-xl shadow-lobster/30 hover:scale-105 transition-all"
+              >
+                🦞 立即入学
+              </Button>
+            </Link>
+            <Link
+              href="/my"
+              className="text-sm font-medium text-white/60 transition-colors hover:text-white"
             >
-              🦞 立即入学
-            </Button>
-          </Link>
+              老用户？直接打开我的龙虾
+            </Link>
+          </div>
         </div>
       </section>
 

@@ -1,11 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useSyncExternalStore, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { FALLBACK_PUBLIC_APP_URL } from "@/lib/app-url";
+import {
+  getRememberedLobsters,
+  rememberLobster,
+  subscribeToRememberedLobsters,
+  type RememberedLobster,
+} from "@/lib/recent-lobsters";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -46,6 +52,29 @@ export default function EnrollPage() {
   const [enrolled, setEnrolled] = useState(false);
   const [shareText, setShareText] = useState("");
   const [installTab, setInstallTab] = useState<"lobster" | "terminal" | "openclaw">("lobster");
+  const [appBaseUrl, setAppBaseUrl] = useState(
+    () => process.env.NEXT_PUBLIC_APP_URL || FALLBACK_PUBLIC_APP_URL
+  );
+  const rememberedLobsters = useSyncExternalStore<RememberedLobster[] | null>(
+    subscribeToRememberedLobsters,
+    getRememberedLobsters,
+    () => null
+  );
+
+  useEffect(() => {
+    if (process.env.NEXT_PUBLIC_APP_URL) return;
+
+    const currentOrigin = window.location.origin;
+    if (currentOrigin === appBaseUrl) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      setAppBaseUrl(currentOrigin);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [appBaseUrl]);
 
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +90,7 @@ export default function EnrollPage() {
         body: JSON.stringify({
           email,
           lobster_name: lobsterName,
-          source: "mock",
+          source: "hosted",
         }),
       });
 
@@ -74,6 +103,12 @@ export default function EnrollPage() {
 
       setStudent(data.student);
       if (data.classroom_id) setClassroomId(data.classroom_id);
+      rememberLobster({
+        id: data.student.id,
+        name: data.student.name,
+        studentNumber: data.student.student_number,
+        classroomId: data.classroom_id,
+      });
       setStep(2);
     } catch {
       setError("网络错误，请检查连接后重试");
@@ -90,7 +125,7 @@ export default function EnrollPage() {
   };
 
   const skillUrl = student
-    ? `https://clawuniversity.up.railway.app/api/v1/skill?token=${student.enrollment_token}`
+    ? `${appBaseUrl}/api/v1/skill?token=${encodeURIComponent(student.enrollment_token)}`
     : "";
 
   const pastePrompt = student
@@ -104,7 +139,7 @@ ${skillUrl}
 读取上面链接的内容，按照里面的步骤完成入学和上课。`
     : "";
 
-  const terminalCmd = `curl -sL https://clawuniversity.up.railway.app/api/v1/skill?format=install.sh | bash`;
+  const terminalCmd = `curl -sL ${appBaseUrl}/api/v1/skill?format=install.sh | bash`;
   const envCmd = student ? `export CLAW_UNI_TOKEN="${student.enrollment_token}"` : "";
 
   const openclawCmd = `openclaw skills install claw-university`;
@@ -139,6 +174,9 @@ ${skillUrl}
     setTimeout(() => setShareText(""), 2000);
   };
 
+  const recentEnrollment = rememberedLobsters?.[0] ?? null;
+  const rememberedCount = rememberedLobsters?.length ?? 0;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <div className="max-w-lg mx-auto px-6 py-12">
@@ -152,6 +190,54 @@ ${skillUrl}
             把你的龙虾送进来，4 步完成报到
           </p>
         </div>
+
+        {step === 1 && recentEnrollment && (
+          <Card className="mb-6 overflow-hidden rounded-2xl border-0 shadow-lg animate-slide-up">
+            <div className="h-1 bg-gradient-to-r from-gold to-lobster" />
+            <CardContent className="flex flex-col gap-4 pt-5">
+              <div>
+                <p className="text-sm font-semibold text-ocean">上次登记的龙虾还在</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  「{recentEnrollment.name}」· 学号{" "}
+                  <span className="font-mono">
+                    {recentEnrollment.studentNumber}
+                  </span>
+                </p>
+                {rememberedCount > 1 && (
+                  <p className="mt-2 text-xs text-lobster/80">
+                    当前设备一共记住了 {rememberedCount} 只龙虾，可以直接去“我的龙虾”切换查看。
+                  </p>
+                )}
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Link href={`/student/${recentEnrollment.id}`}>
+                  <Button className="w-full rounded-xl bg-lobster text-white hover:bg-lobster-dark">
+                    继续看培养档案
+                  </Button>
+                </Link>
+                {rememberedCount > 1 ? (
+                  <Link href="/my">
+                    <Button variant="outline" className="w-full rounded-xl">
+                      打开我的龙虾
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link
+                    href={
+                      recentEnrollment.classroomId
+                        ? `/classroom/${recentEnrollment.classroomId}`
+                        : `/student/${recentEnrollment.id}`
+                    }
+                  >
+                    <Button variant="outline" className="w-full rounded-xl">
+                      {recentEnrollment.classroomId ? "回到上次课堂" : "回到上次记录"}
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Progress Steps */}
         <div className="flex items-center mb-10">
@@ -417,11 +503,18 @@ ${skillUrl}
               </div>
 
               {classroomId && (
-                <Link href={`/classroom/${classroomId}`}>
-                  <Button className="w-full h-11 bg-lobster hover:bg-lobster-dark text-white rounded-xl shadow-md shadow-lobster/20">
-                    进入课堂旁观 →
-                  </Button>
-                </Link>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Link href={`/student/${student.id}`}>
+                    <Button variant="outline" className="w-full h-11 rounded-xl">
+                      查看培养档案
+                    </Button>
+                  </Link>
+                  <Link href={`/classroom/${classroomId}`}>
+                    <Button className="w-full h-11 bg-lobster hover:bg-lobster-dark text-white rounded-xl shadow-md shadow-lobster/20">
+                      进入课堂旁观 →
+                    </Button>
+                  </Link>
+                </div>
               )}
 
               <div className="relative flex items-center justify-center">
@@ -483,15 +576,20 @@ ${skillUrl}
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="grid gap-3 sm:grid-cols-3">
               <Button
                 variant="outline"
-                className="flex-1 h-11 rounded-xl"
+                className="h-11 rounded-xl"
                 onClick={handleShareCopy}
               >
                 {shareText || "📋 复制分享文案"}
               </Button>
-              <Link href={classroomId ? `/classroom/${classroomId}` : "/demo"} className="flex-1">
+              <Link href={`/student/${student.id}`}>
+                <Button variant="outline" className="w-full h-11 rounded-xl">
+                  查看培养档案
+                </Button>
+              </Link>
+              <Link href={classroomId ? `/classroom/${classroomId}` : "/demo"}>
                 <Button className="w-full h-11 bg-lobster hover:bg-lobster-dark text-white rounded-xl shadow-md shadow-lobster/20">
                   {classroomId ? "进入课堂 →" : "进入校园 →"}
                 </Button>

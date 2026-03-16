@@ -1,13 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { createSession, startSession, getSession } from "@/lib/classroom/session";
+import {
+  INTRO_COURSE_KEY,
+  ensureStudentClassroom,
+  getOrCreateCourseByRuntimeKey,
+} from "@/lib/classroom/ownership";
+import { getBaseUrl } from "@/lib/app-url";
+import { maybeGetCourseRuntimeByKey } from "@/lib/courses/registry";
 
 export async function POST(req: NextRequest) {
   try {
-    const { student_id } = await req.json();
+    const { student_id, course_key } = await req.json();
+    const baseUrl = getBaseUrl(req);
+    const courseKey =
+      typeof course_key === "string" && course_key.length > 0
+        ? course_key
+        : INTRO_COURSE_KEY;
 
     if (!student_id) {
       return NextResponse.json({ error: "Missing student_id" }, { status: 400 });
+    }
+
+    const runtime = maybeGetCourseRuntimeByKey(courseKey);
+    if (!runtime) {
+      return NextResponse.json({ error: "Unknown course_key" }, { status: 400 });
     }
 
     const students = await sql`SELECT id, name FROM students WHERE id = ${student_id}`;
@@ -16,72 +33,72 @@ export async function POST(req: NextRequest) {
     }
 
     const student = students[0];
+    const course = await getOrCreateCourseByRuntimeKey(courseKey);
+    const classroom = await ensureStudentClassroom(student.id, course.id);
+    const classroomId = classroom.classroomId;
 
-    const courses = await sql`SELECT id FROM courses WHERE name = '《龙虾导论》' LIMIT 1`;
-    let courseId: string;
+    let session = getSession(classroomId);
+    if (!session) {
+      if (classroom.classroomStatus === "in_progress") {
+        const resultUrl = new URL(`/api/v1/classroom/${classroomId}/result`, baseUrl);
+        resultUrl.searchParams.set("student_id", student.id);
 
-    if (courses.length > 0) {
-      courseId = courses[0].id;
-    } else {
-      const [newCourse] = await sql`
-        INSERT INTO courses (name, description, category, teacher_name, teacher_style)
-        VALUES ('《龙虾导论》', '让 agent 理解龙虾大学学生的身份，建立基本行为规范，学会正确的自我介绍。', 'required', '蓝钳教授', 'roast')
-        RETURNING id
-      `;
-      courseId = newCourse.id;
+        const claimUrl = new URL(resultUrl.toString());
+        claimUrl.searchParams.set("claim", "1");
+
+        return NextResponse.json(
+          {
+            error: "Classroom runtime is unavailable for this in-progress class",
+            classroom_id: classroomId,
+            status: "runtime_missing",
+            poll_url: `${baseUrl}/api/v1/classroom/${classroomId}/messages`,
+            respond_url: `${baseUrl}/api/v1/classroom/${classroomId}/respond`,
+            result_url: resultUrl.toString(),
+            claim_url: claimUrl.toString(),
+          },
+          { status: 409 }
+        );
+      }
+
+      session = await createSession(
+        classroomId,
+        course.id,
+        courseKey,
+        student.id,
+        student.name
+      );
     }
 
-    const existing = await sql`
-      SELECT c.id, c.status FROM classrooms c
-      WHERE c.course_id = ${courseId}
-        AND c.status IN ('scheduled', 'in_progress')
-      ORDER BY c.created_at DESC
-      LIMIT 1
-    `;
+    const resultUrl = new URL(`/api/v1/classroom/${classroomId}/result`, baseUrl);
+    resultUrl.searchParams.set("student_id", student.id);
 
-    if (existing.length > 0) {
-      const classroomId = existing[0].id;
-      const session = getSession(classroomId);
+    const claimUrl = new URL(resultUrl.toString());
+    claimUrl.searchParams.set("claim", "1");
 
-      if (session && session.status === "waiting_join") {
-        startSession(classroomId);
-        return NextResponse.json({
-          classroom_id: classroomId,
-          status: "started",
-          message: `${student.name}已加入课堂，开始上课`,
-        });
-      }
-
-      if (!session) {
-        await createSession(classroomId, courseId, student.id, student.name);
-        startSession(classroomId);
-        return NextResponse.json({
-          classroom_id: classroomId,
-          status: "started",
-          message: `${student.name}已加入课堂，开始上课`,
-        });
-      }
-
+    if (session.status === "waiting_join") {
+      await startSession(classroomId);
       return NextResponse.json({
         classroom_id: classroomId,
-        status: session.status,
-        message: `课堂进行中，请继续上课`,
+        status: "started",
+        message: `${student.name}已进入${runtime.meta.name}，开始上课`,
+        poll_url: `${baseUrl}/api/v1/classroom/${classroomId}/messages`,
+        respond_url: `${baseUrl}/api/v1/classroom/${classroomId}/respond`,
+        result_url: resultUrl.toString(),
+        claim_url: claimUrl.toString(),
       });
     }
 
-    const [classroom] = await sql`
-      INSERT INTO classrooms (course_id, max_students)
-      VALUES (${courseId}, 1)
-      RETURNING id
-    `;
-
-    await createSession(classroom.id, courseId, student.id, student.name);
-    startSession(classroom.id);
-
     return NextResponse.json({
-      classroom_id: classroom.id,
-      status: "started",
-      message: `课堂已创建，${student.name}开始上课`,
+      classroom_id: classroomId,
+      status: session.status,
+      message:
+        session.status === "completed"
+          ? `${runtime.meta.name}已结束，请查看结果`
+          : `${runtime.meta.name}进行中，请继续上课`,
+      poll_url: `${baseUrl}/api/v1/classroom/${classroomId}/messages`,
+      respond_url: `${baseUrl}/api/v1/classroom/${classroomId}/respond`,
+      result_url: resultUrl.toString(),
+      claim_url: claimUrl.toString(),
     });
   } catch (err) {
     console.error("Start classroom error:", err);

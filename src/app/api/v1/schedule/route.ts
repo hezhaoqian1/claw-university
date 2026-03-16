@@ -1,18 +1,48 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { buildSchedulePreview } from "@/lib/student/dashboard";
 
-export async function GET() {
-  return NextResponse.json({
-    courses: [
-      {
-        id: "lobster-101",
-        name: "《龙虾导论》",
-        teacher: "蓝钳教授",
-        next_class: new Date(Date.now() + 3600000).toISOString(),
-        status: "enrollable",
-        description:
-          "让你理解「龙虾大学学生」的身份，建立基本行为规范，学会正确的自我介绍。",
-      },
-    ],
-    hint: "Use WS /api/v1/classroom/{course_id}/join to join a classroom when class starts",
-  });
+export async function GET(req: NextRequest) {
+  const studentId = req.nextUrl.searchParams.get("student_id") || undefined;
+
+  try {
+    const schedule = await buildSchedulePreview(studentId);
+
+    return NextResponse.json({
+      immediate_courses: schedule.immediateCourses.map((course) => ({
+        id: course.id,
+        name: course.name,
+        academy: course.academyName,
+        teacher: course.teacherName,
+        difficulty: course.difficulty,
+        duration: course.durationLabel,
+        outcome: course.outcome,
+        reason: course.recommendationReason,
+      })),
+      cohort_classes: schedule.cohortCourses.map((course) => ({
+        id: course.id,
+        name: course.name,
+        academy: course.academyName,
+        teacher: course.teacherName,
+        starts_at: course.startsAt,
+        duration: course.durationLabel,
+        enrolled_count: course.enrolledCount,
+        seat_limit: course.seatLimit,
+        seats_left: course.seatsLeft,
+        reason: course.recommendationReason,
+        cohort_note: course.cohortNote,
+      })),
+      academies: schedule.academies.map((academy) => ({
+        id: academy.id,
+        name: academy.name,
+        motto: academy.motto,
+        summary: academy.summary,
+      })),
+      personalized_for: schedule.personalizedFor,
+      generated_at: schedule.generatedAt,
+      hint: "班课会按时自动开讲；即学课适合马上补短板。",
+    });
+  } catch (error) {
+    console.error("Get academy schedule error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

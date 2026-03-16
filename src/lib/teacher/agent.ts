@@ -1,7 +1,5 @@
 import type { LectureStep } from "@/types";
 import {
-  LECTURE_SCRIPT,
-  COURSE_META,
   TEACHER_COMMENT_TEMPLATES,
 } from "@/lib/courses/lobster-101";
 

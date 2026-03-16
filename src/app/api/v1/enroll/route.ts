@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
-import { createSession, startSession } from "@/lib/classroom/session";
+import { createSession } from "@/lib/classroom/session";
+import {
+  INTRO_COURSE_KEY,
+  ensureStudentClassroom,
+  getOrCreateIntroCourse,
+} from "@/lib/classroom/ownership";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { email, lobster_name, source } = body;
+    const normalizedSource =
+      source === "external_openclaw" || source === "hosted" ? source : "hosted";
 
     if (!email || !lobster_name) {
       return NextResponse.json(
@@ -26,33 +33,23 @@ export async function POST(req: NextRequest) {
 
     const [student] = await sql`
       INSERT INTO students (name, enrollment_token, owner_id, source, student_number)
-      VALUES (${lobster_name}, ${enrollmentToken}, ${user.id}, ${source || "mock"}, ${studentNumber})
+      VALUES (${lobster_name}, ${enrollmentToken}, ${user.id}, ${normalizedSource}, ${studentNumber})
       RETURNING id, name, enrollment_token, student_number, created_at
     `;
 
     let classroomId: string | null = null;
     try {
-      const courses = await sql`SELECT id FROM courses WHERE name = '《龙虾导论》' LIMIT 1`;
-      let courseId: string;
-      if (courses.length > 0) {
-        courseId = courses[0].id;
-      } else {
-        const [c] = await sql`
-          INSERT INTO courses (name, description, category, teacher_name, teacher_style)
-          VALUES ('《龙虾导论》', '让 agent 理解龙虾大学学生的身份，建立基本行为规范，学会正确的自我介绍。', 'required', '蓝钳教授', 'roast')
-          RETURNING id
-        `;
-        courseId = c.id;
-      }
+      const course = await getOrCreateIntroCourse();
+      const classroom = await ensureStudentClassroom(student.id, course.id);
+      classroomId = classroom.classroomId;
 
-      const [classroom] = await sql`
-        INSERT INTO classrooms (course_id, max_students)
-        VALUES (${courseId}, 1)
-        RETURNING id
-      `;
-      classroomId = classroom.id;
-
-      await createSession(classroom.id, courseId, student.id, student.name);
+      await createSession(
+        classroomId,
+        course.id,
+        INTRO_COURSE_KEY,
+        student.id,
+        student.name
+      );
     } catch (err) {
       console.error("Auto classroom creation failed:", err);
     }

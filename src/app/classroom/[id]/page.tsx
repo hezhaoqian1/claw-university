@@ -21,6 +21,8 @@ interface Message {
 
 interface ClassroomData {
   status: string;
+  course_name: string;
+  teacher_name: string;
   waiting_for_response: boolean;
   prompt_hint: string | null;
   messages: Message[];
@@ -44,6 +46,8 @@ export default function ClassroomPage() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [status, setStatus] = useState<string>("loading");
+  const [courseName, setCourseName] = useState("《龙虾导论》");
+  const [teacherName, setTeacherName] = useState("蓝钳教授");
   const [evaluation, setEvaluation] = useState<EvaluationData | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -67,6 +71,8 @@ export default function ClassroomPage() {
 
       const data: ClassroomData = await res.json();
       setStatus(data.status);
+      setCourseName(data.course_name || "《龙虾导论》");
+      setTeacherName(data.teacher_name || "蓝钳教授");
 
       if (data.messages.length > 0) {
         if (lastTimestamp.current) {
@@ -97,26 +103,49 @@ export default function ClassroomPage() {
   }, [classroomId]);
 
   useEffect(() => {
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 2000);
-    return () => clearInterval(interval);
+    const kickoff = window.setTimeout(() => {
+      void fetchMessages();
+    }, 0);
+    const interval = window.setInterval(() => {
+      void fetchMessages();
+    }, 2000);
+
+    return () => {
+      window.clearTimeout(kickoff);
+      window.clearInterval(interval);
+    };
   }, [fetchMessages]);
 
   useEffect(() => {
-    if (status === "completed" && !evaluation) {
-      fetchResult();
-    }
+    if (status !== "completed" || evaluation) return;
+
+    const kickoff = window.setTimeout(() => {
+      void fetchResult();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(kickoff);
+    };
   }, [status, evaluation, fetchResult]);
 
   useEffect(() => {
-    if (messages.length > prevMessageCount.current) {
+    if (messages.length <= prevMessageCount.current) return;
+
+    prevMessageCount.current = messages.length;
+    scrollToBottom();
+
+    const frame = window.requestAnimationFrame(() => {
       setIsTyping(true);
-      const timer = setTimeout(() => setIsTyping(false), 800);
-      prevMessageCount.current = messages.length;
-      scrollToBottom();
-      return () => clearTimeout(timer);
-    }
-  }, [messages, scrollToBottom]);
+    });
+    const timer = window.setTimeout(() => {
+      setIsTyping(false);
+    }, 800);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, [messages.length, scrollToBottom]);
 
   const displayStatus =
     status === "completed"
@@ -128,8 +157,8 @@ export default function ClassroomPage() {
   return (
     <div className="flex flex-col h-screen bg-gradient-to-b from-gray-50 to-white">
       <ClassroomHeader
-        courseName="《龙虾导论》第一课"
-        teacherName="蓝钳教授"
+        courseName={courseName}
+        teacherName={teacherName}
         studentCount={1}
         status={displayStatus as "scheduled" | "in_progress" | "completed"}
       />
@@ -141,7 +170,7 @@ export default function ClassroomPage() {
             <p className="text-base font-medium text-ocean mb-1">
               {status === "waiting_join" ? "等待龙虾进入教室…" : "课堂加载中…"}
             </p>
-            <p className="text-xs text-muted-foreground">蓝钳教授正在准备讲义</p>
+            <p className="text-xs text-muted-foreground">{teacherName} 正在准备讲义</p>
           </div>
         )}
 
@@ -159,7 +188,7 @@ export default function ClassroomPage() {
         ))}
 
         {isTyping && status !== "completed" && (
-          <TypingIndicator name="蓝钳教授" />
+          <TypingIndicator name={teacherName} />
         )}
       </div>
 
@@ -214,9 +243,9 @@ export default function ClassroomPage() {
                     返回首页
                   </Button>
                 </Link>
-                <Link href="/enroll" className="flex-1">
+                <Link href="/my" className="flex-1">
                   <Button className="w-full bg-lobster hover:bg-lobster-dark text-white rounded-xl">
-                    继续学习 →
+                    回到我的龙虾
                   </Button>
                 </Link>
               </div>

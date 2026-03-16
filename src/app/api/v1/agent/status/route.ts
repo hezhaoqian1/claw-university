@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
-
-function getBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL || "https://clawuniversity.up.railway.app";
-}
+import { getBaseUrl } from "@/lib/app-url";
+import { ensureClassroomDataModel } from "@/lib/classroom/ownership";
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
@@ -13,6 +11,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    await ensureClassroomDataModel();
+
     const students = await sql`
       SELECT id, name FROM students WHERE enrollment_token = ${token}
     `;
@@ -22,33 +22,48 @@ export async function GET(req: NextRequest) {
     }
 
     const student = students[0];
+    const baseUrl = getBaseUrl(req);
 
     const pendingClassrooms = await sql`
       SELECT c.id, c.status, co.name as course_name
-      FROM classrooms c
-      JOIN courses co ON co.id = c.course_id
-      JOIN classroom_messages cm ON cm.classroom_id = c.id AND cm.agent_id = ${student.id}
+      FROM classroom_enrollments ce
+      JOIN classrooms c ON c.id = ce.classroom_id
+      JOIN courses co ON co.id = ce.course_id
       WHERE c.status IN ('scheduled', 'in_progress')
-      GROUP BY c.id, c.status, co.name
-      ORDER BY c.created_at DESC
+        AND ce.student_id = ${student.id}
+      ORDER BY ce.enrolled_at DESC
       LIMIT 1
     `;
 
     let pendingClassroom = null;
     if (pendingClassrooms.length > 0) {
       const pc = pendingClassrooms[0];
+      const resultUrl = new URL(`/api/v1/classroom/${pc.id}/result`, baseUrl);
+      resultUrl.searchParams.set("student_id", student.id);
+
+      const claimUrl = new URL(resultUrl.toString());
+      claimUrl.searchParams.set("claim", "1");
+
       pendingClassroom = {
         classroom_id: pc.id,
         course_name: pc.course_name,
         status: pc.status,
-        poll_url: `${getBaseUrl()}/api/v1/classroom/${pc.id}/messages`,
-        respond_url: `${getBaseUrl()}/api/v1/classroom/${pc.id}/respond`,
-        result_url: `${getBaseUrl()}/api/v1/classroom/${pc.id}/result`,
+        poll_url: `${baseUrl}/api/v1/classroom/${pc.id}/messages`,
+        respond_url: `${baseUrl}/api/v1/classroom/${pc.id}/respond`,
+        result_url: resultUrl.toString(),
+        claim_url: claimUrl.toString(),
       };
     }
 
     const newResults = await sql`
-      SELECT t.final_score, t.grade, t.teacher_comment, co.name as course_name
+      SELECT
+        t.classroom_id,
+        t.final_score,
+        t.grade,
+        t.teacher_comment,
+        t.memory_delta,
+        t.soul_suggestion,
+        co.name as course_name
       FROM transcripts t
       JOIN courses co ON co.id = t.course_id
       WHERE t.student_id = ${student.id}
@@ -71,10 +86,28 @@ export async function GET(req: NextRequest) {
       student_name: student.name,
       pending_classroom: pendingClassroom,
       new_results: newResults.map((r) => ({
+        classroom_id: r.classroom_id,
         course_name: r.course_name,
         score: r.final_score,
         grade: r.grade,
         comment: r.teacher_comment,
+        memory_delta: r.memory_delta,
+        soul_suggestion: r.soul_suggestion,
+        result_url: r.classroom_id
+          ? (() => {
+              const url = new URL(`/api/v1/classroom/${r.classroom_id}/result`, baseUrl);
+              url.searchParams.set("student_id", student.id);
+              return url.toString();
+            })()
+          : null,
+        claim_url: r.classroom_id
+          ? (() => {
+              const url = new URL(`/api/v1/classroom/${r.classroom_id}/result`, baseUrl);
+              url.searchParams.set("student_id", student.id);
+              url.searchParams.set("claim", "1");
+              return url.toString();
+            })()
+          : null,
       })),
       available_courses: availableCourses.map((c) => ({
         id: c.id,
