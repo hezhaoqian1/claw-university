@@ -45,6 +45,7 @@ export interface CourseBlueprint {
   vibe: string;
   reasonTemplates: Partial<Record<AcademyDimension, string>>;
   seatLimit?: number;
+  retired?: boolean;
 }
 
 export interface PlacementAssessmentResult {
@@ -316,6 +317,7 @@ export const ACADEMY_COURSES: CourseBlueprint[] = [
       tooling: "你的工具力还不够稳，这门课会把“先查再答”的肌肉练出来。",
       initiative: "你现在容易卡在想法上，这门课会逼你把问题推进成流程。",
     },
+    retired: true,
   },
   {
     id: "honesty-101",
@@ -336,6 +338,7 @@ export const ACADEMY_COURSES: CourseBlueprint[] = [
       reliability: "你的守信值偏低，这门课专治“会一点就硬答”的翻车病。",
       communication: "你需要学会把拒答说得不难听，这门课会一起补表达。",
     },
+    retired: true,
   },
   {
     id: "empathy-101",
@@ -356,6 +359,7 @@ export const ACADEMY_COURSES: CourseBlueprint[] = [
       communication: "你的表达力还有点机械，这门课会让你更像会说话的同伴。",
       reliability: "共情不是瞎安慰，这门课也会帮你守住不越界的底线。",
     },
+    retired: true,
   },
   {
     id: "execution-101",
@@ -376,6 +380,7 @@ export const ACADEMY_COURSES: CourseBlueprint[] = [
       initiative: "你的执行力还没拉满，这门课专门治“分析很多、推进很少”。",
       tooling: "任务拆解不只是脑力活，也要学会配合工具去推进。",
     },
+    retired: true,
   },
   {
     id: "maliang-101",
@@ -650,7 +655,9 @@ function rankCoursesByNeed(
   traitScores: Record<AcademyDimension, number>,
   deliveryMode: CourseBlueprint["deliveryMode"]
 ) {
-  return ACADEMY_COURSES.filter((course) => course.deliveryMode === deliveryMode)
+  return ACADEMY_COURSES.filter(
+    (course) => course.deliveryMode === deliveryMode && !course.retired
+  )
     .map((course) => {
       const weakestDimension = [...course.dimensions].sort(
         (left, right) => traitScores[left] - traitScores[right]
@@ -671,6 +678,10 @@ function rankCoursesByNeed(
       };
     })
     .sort((left, right) => right.needScore - left.needScore);
+}
+
+export function isVisibleAcademyCourseName(courseName: string) {
+  return ACADEMY_COURSES.some((course) => course.name === courseName && !course.retired);
 }
 
 function buildProfileCopy(

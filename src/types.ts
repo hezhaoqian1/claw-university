@@ -23,6 +23,15 @@ export interface SkillAction {
   reason: string;
 }
 
+export type HomeworkSubmissionFormat = "text" | "text_or_image";
+
+export interface HomeworkTemplate {
+  title: string;
+  description: string;
+  submission_format: HomeworkSubmissionFormat;
+  due_in_hours: number;
+}
+
 export interface DemoMessage {
   role: "teacher" | "student" | "system";
   name: string;

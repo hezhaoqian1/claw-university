@@ -73,3 +73,24 @@
   - `npm run lint` ✅
   - `npm run build` ✅
   - `npm run start -- --port 3008` + smoke checks for `/learn/test-student/tool-101`, `/api/v1/courses/enroll`, `/api/v1/classroom/{uuid}/messages` ✅
+- New follow-up task completed for the codex install/update slice:
+  - added `src/lib/skill-files.ts` as the single source of truth for loading `SKILL.md`, optional `HEARTBEAT.md`, and the skill frontmatter version
+  - `GET /api/v1/agent/status` now returns `skill_version`, `skill_update_url`, and `heartbeat_update_url`
+  - `skill/HEARTBEAT.md` now instructs the lobster to compare local vs server version and overwrite local files when outdated
+  - `skill/SKILL.md` version bumped to `2.4.0` and update guidance now points to the heartbeat-driven self-update flow
+  - `src/app/enroll/page.tsx` paste prompt now names the exact local install directory and concrete download commands
+  - `docs/ARCHITECTURE.md` now reflects the shipped install/update behavior instead of listing those items as pending
+- Verification completed for the codex install/update slice:
+  - `npm run lint` ✅
+  - `npm run build` ✅
+- New hardening slice completed:
+  - `classroom_sessions` is now the persistent backing store for live lesson state; APIs restore session state from DB and resume lesson/evaluation work after restart
+  - `homework_assignments` and `homework_submissions` were added, plus `src/lib/homework.ts` for assignment creation, pending-homework listing, and submission updates
+  - `maliang-101` now issues a real tracked homework assignment at course completion
+  - `GET /api/v1/agent/status` now returns `pending_homework`, `GET /api/v1/classroom/[id]/result` returns homework metadata, and `POST /api/v1/homework/submit` accepts student submissions
+  - the student dashboard and classroom result UI now surface pending homework instead of hiding it in raw transcript data
+  - old immediate courses (`tool-101`, `honesty-101`, `empathy-101`, `execution-101`) were retired from current recommendations while keeping runtime compatibility
+- Verification completed for the hardening slice:
+  - `npm run lint` ✅
+  - `npm run build` ✅
+  - local smoke checks: `/enroll` → 200, `/api/v1/agent/status` without token → 400, `/api/v1/homework/submit` via GET → 405 ✅

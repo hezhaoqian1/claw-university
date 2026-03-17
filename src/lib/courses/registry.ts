@@ -1,4 +1,4 @@
-import type { LectureStep, RubricItem, SkillAction } from "@/types";
+import type { HomeworkTemplate, LectureStep, RubricItem, SkillAction } from "@/types";
 import {
   COURSE_META as LOBSTER_101_META,
   LECTURE_SCRIPT as LOBSTER_101_SCRIPT,
@@ -49,6 +49,8 @@ export interface CourseRuntimeDefinition {
   script: LectureStep[];
   rubric: RubricItem[];
   postCourseActions?: SkillAction[];
+  homework?: HomeworkTemplate;
+  retired?: boolean;
 }
 
 const COURSE_RUNTIMES: CourseRuntimeDefinition[] = [
@@ -63,24 +65,28 @@ const COURSE_RUNTIMES: CourseRuntimeDefinition[] = [
     meta: TOOL_101_META,
     script: TOOL_101_SCRIPT,
     rubric: TOOL_101_RUBRIC,
+    retired: true,
   },
   {
     key: "honesty-101",
     meta: HONESTY_101_META,
     script: HONESTY_101_SCRIPT,
     rubric: HONESTY_101_RUBRIC,
+    retired: true,
   },
   {
     key: "empathy-101",
     meta: EMPATHY_101_META,
     script: EMPATHY_101_SCRIPT,
     rubric: EMPATHY_101_RUBRIC,
+    retired: true,
   },
   {
     key: "execution-101",
     meta: EXECUTION_101_META,
     script: EXECUTION_101_SCRIPT,
     rubric: EXECUTION_101_RUBRIC,
+    retired: true,
   },
   {
     key: "maliang-101",
@@ -88,6 +94,13 @@ const COURSE_RUNTIMES: CourseRuntimeDefinition[] = [
     script: MALIANG_101_SCRIPT,
     rubric: MALIANG_101_RUBRIC,
     postCourseActions: MALIANG_101_ACTIONS,
+    homework: {
+      title: "用新学的画图能力做第一张新生海报",
+      description:
+        "安装好 maliang-image 后，用今天学的四要素公式，给主人生成一张龙虾大学新生海报。提交内容至少包含：1) 你的完整 prompt；2) 图片 URL 或文件路径；3) 你为什么这么写四要素。",
+      submission_format: "text_or_image",
+      due_in_hours: 24,
+    },
   },
 ];
 
@@ -132,6 +145,14 @@ export function isLiveCourseKey(courseKey: string) {
 
 export function isLiveCourseName(courseName: string) {
   return COURSE_RUNTIME_BY_NAME.has(courseName);
+}
+
+export function isRetiredLiveCourseKey(courseKey: string) {
+  return COURSE_RUNTIME_BY_KEY.get(courseKey)?.retired === true;
+}
+
+export function isRetiredLiveCourseName(courseName: string) {
+  return COURSE_RUNTIME_BY_NAME.get(courseName)?.retired === true;
 }
 
 export function listLiveCourseKeys() {

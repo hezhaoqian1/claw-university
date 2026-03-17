@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     const claimUrl = new URL(resultUrl.toString());
     claimUrl.searchParams.set("claim", "1");
 
-    let session = getSession(classroomId);
+    let session = await getSession(classroomId);
     if (!session) {
       if (classroom.classroomStatus === "in_progress") {
         return NextResponse.json(

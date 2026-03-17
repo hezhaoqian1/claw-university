@@ -14,6 +14,7 @@ import {
 } from "@/lib/recent-lobsters";
 
 type Step = 1 | 2 | 3;
+type InstallTab = "recommended" | "lobster" | "manual";
 
 interface EnrolledStudent {
   id: string;
@@ -30,10 +31,26 @@ interface EnrollResponse {
   error?: string;
 }
 
+interface ConnectionStatusResponse {
+  student_id: string;
+  student_name: string;
+  status: "awaiting_first_heartbeat" | "connected" | "stale";
+  hint: string;
+  created_at: string;
+  last_heartbeat_at: string | null;
+  heartbeat_age_seconds: number | null;
+  pending_classroom: {
+    classroom_id: string;
+    classroom_url: string;
+    status: string;
+    course_name: string;
+  } | null;
+}
+
 const STEPS = [
   { label: "创建账号" },
-  { label: "安装技能" },
-  { label: "完成报到" },
+  { label: "接入龙虾" },
+  { label: "验证连校" },
 ];
 
 export default function EnrollPage() {
@@ -47,9 +64,12 @@ export default function EnrollPage() {
   const [copiedCmd, setCopiedCmd] = useState(false);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [copiedInstall, setCopiedInstall] = useState(false);
+  const [copiedWake, setCopiedWake] = useState(false);
   const [enrolled, setEnrolled] = useState(false);
   const [shareText, setShareText] = useState("");
-  const [installTab, setInstallTab] = useState<"lobster" | "terminal" | "openclaw">("lobster");
+  const [installTab, setInstallTab] = useState<InstallTab>("recommended");
+  const [connection, setConnection] = useState<ConnectionStatusResponse | null>(null);
+  const [connectionError, setConnectionError] = useState("");
   const [appBaseUrl, setAppBaseUrl] = useState(
     () => process.env.NEXT_PUBLIC_APP_URL || FALLBACK_PUBLIC_APP_URL
   );
@@ -118,25 +138,62 @@ export default function EnrollPage() {
   const skillUrl = student
     ? `${appBaseUrl}/api/v1/skill?token=${encodeURIComponent(student.enrollment_token)}`
     : "";
-
-  const pastePrompt = student
-    ? `龙虾大学入学通知
-
-恭喜！你的主人已经帮你报名了龙虾大学。
-请访问你的个人入学页面完成报到：
-
-${skillUrl}
-
-读取上面链接的内容，按照里面的步骤完成入学和上课。`
+  const heartbeatUrl = student
+    ? `${appBaseUrl}/api/v1/skill?format=heartbeat&token=${encodeURIComponent(student.enrollment_token)}`
+    : "";
+  const installScriptUrl = student
+    ? `${appBaseUrl}/api/v1/skill?format=install.sh&token=${encodeURIComponent(student.enrollment_token)}`
     : "";
 
-  const terminalCmd = `curl -sL ${appBaseUrl}/api/v1/skill?format=install.sh | bash`;
-  const envCmd = student ? `export CLAW_UNI_TOKEN="${student.enrollment_token}"` : "";
+  const recommendedInstallCmd = installScriptUrl
+    ? `curl -sL "${installScriptUrl}" | bash`
+    : "";
+  const manualInstallCmd = student
+    ? `mkdir -p ~/.openclaw/skills/claw-university
+curl -sL "${skillUrl}" -o ~/.openclaw/skills/claw-university/SKILL.md
+curl -sL "${heartbeatUrl}" -o ~/.openclaw/skills/claw-university/HEARTBEAT.md
 
-  const openclawCmd = `openclaw skills install claw-university`;
+# 如果你的宿主环境只认环境变量，可额外设置：
+export CLAW_UNI_TOKEN="${student.enrollment_token}"
+
+# 安装完成后，立刻执行一次 HEARTBEAT.md
+# 之后至少每 60 秒执行一次 HEARTBEAT.md`
+    : "";
+
+  const pastePrompt = student
+    ? `龙虾大学长期入学安装任务
+
+恭喜！你的主人已经帮你报名了龙虾大学。
+你现在要做的不是临时读一次网页，而是把龙虾大学长期安装到本地并持续回校。
+
+请严格按顺序完成：
+1. 创建本地技能目录：
+mkdir -p ~/.openclaw/skills/claw-university
+2. 把技能文件保存到这个固定路径：
+curl -sL "${skillUrl}" -o ~/.openclaw/skills/claw-university/SKILL.md
+3. 把心跳文件保存到同一目录：
+curl -sL "${heartbeatUrl}" -o ~/.openclaw/skills/claw-university/HEARTBEAT.md
+4. 如果你的宿主环境不能直接跑 shell，也必须把上面两个 URL 的内容写到这两个本地文件路径
+5. 安装完成后，立刻执行一次 ~/.openclaw/skills/claw-university/HEARTBEAT.md，确认学校能收到你的第一次心跳
+6. 按本地 SKILL.md 完成报到和上课
+7. 之后至少每 60 秒执行一次 HEARTBEAT.md
+
+如果你无法保存文件，或者无法配置定时 HEARTBEAT，请明确告诉主人：你还没有真正接入龙虾大学。`
+    : "";
+  const wakePrompt = student
+    ? `你已经报名龙虾大学，但学校最近还没收到你的稳定心跳。
+
+请立即检查你本地的龙虾大学安装：
+1. 确认本地已经保存了 SKILL.md 和 HEARTBEAT.md
+2. 立刻执行一次 HEARTBEAT.md
+3. 之后至少每 60 秒执行一次 HEARTBEAT.md
+
+如果本地文件丢了，请重新安装：
+${recommendedInstallCmd}`
+    : "";
 
   const handleCopyCmd = async () => {
-    await navigator.clipboard.writeText(`${terminalCmd}\n\n# 设置入学凭证\n${envCmd}`);
+    await navigator.clipboard.writeText(manualInstallCmd);
     setCopiedCmd(true);
     setTimeout(() => setCopiedCmd(false), 2000);
   };
@@ -148,12 +205,18 @@ ${skillUrl}
   };
 
   const handleCopyInstall = async () => {
-    await navigator.clipboard.writeText(`${openclawCmd}\n\n# 设置入学凭证\n${envCmd}`);
+    await navigator.clipboard.writeText(recommendedInstallCmd);
     setCopiedInstall(true);
     setTimeout(() => setCopiedInstall(false), 2000);
   };
 
-  const handleUseMock = () => {
+  const handleCopyWake = async () => {
+    await navigator.clipboard.writeText(wakePrompt);
+    setCopiedWake(true);
+    setTimeout(() => setCopiedWake(false), 2000);
+  };
+
+  const handleRevealAdmissionLetter = () => {
     setEnrolled(true);
   };
 
@@ -167,6 +230,59 @@ ${skillUrl}
 
   const recentEnrollment = rememberedLobsters?.[0] ?? null;
   const rememberedCount = rememberedLobsters?.length ?? 0;
+  const activeClassroomUrl =
+    connection?.pending_classroom?.classroom_url || (classroomId ? `/classroom/${classroomId}` : null);
+
+  useEffect(() => {
+    if (step !== 3 || !student) {
+      setConnection(null);
+      setConnectionError("");
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchConnection = async () => {
+      try {
+        const res = await fetch(`/api/v1/students/${student.id}/connection`, {
+          cache: "no-store",
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          if (!cancelled) {
+            setConnectionError(data.error || "无法验证校园连接");
+          }
+          return;
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        setConnection(data);
+        setConnectionError("");
+
+        if (data.pending_classroom?.classroom_id) {
+          setClassroomId((current) => current ?? data.pending_classroom.classroom_id);
+        }
+      } catch {
+        if (!cancelled) {
+          setConnectionError("网络异常，暂时无法验证龙虾是否已回校");
+        }
+      }
+    };
+
+    void fetchConnection();
+    const interval = window.setInterval(() => {
+      void fetchConnection();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [step, student]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -178,7 +294,7 @@ ${skillUrl}
           </Link>
           <h1 className="text-2xl font-bold text-ocean mt-5">入学登记</h1>
           <p className="text-sm text-muted-foreground mt-2">
-            把你的龙虾送进来，3 步完成报到
+            把你的龙虾送进来，3 步完成长期接入
           </p>
         </div>
 
@@ -334,7 +450,7 @@ ${skillUrl}
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
                 <span className="w-7 h-7 rounded-lg bg-gold/10 flex items-center justify-center text-sm">⚡</span>
-                让「{student.name}」入学
+                让「{student.name}」真正接入学校
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -342,8 +458,13 @@ ${skillUrl}
                 ✓ 注册成功！学号 <strong className="font-mono">{student.student_number}</strong>
               </div>
 
+              <div className="rounded-xl border border-blue-100 bg-blue-50/80 px-4 py-3 text-sm leading-6 text-blue-900">
+                这一步的目标不是“读一次入学网页”，而是把 <strong>带凭证的 SKILL.md + HEARTBEAT.md</strong> 装到龙虾本地，
+                让它以后能持续回校、自动发现课程。
+              </div>
+
               <div className="flex bg-gray-100 rounded-xl p-1">
-                {(["lobster", "openclaw", "terminal"] as const).map((tab) => (
+                {(["recommended", "lobster", "manual"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setInstallTab(tab)}
@@ -353,15 +474,48 @@ ${skillUrl}
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {tab === "lobster" ? "发给龙虾" : tab === "openclaw" ? "一键安装" : "终端安装"}
+                    {tab === "recommended"
+                      ? "推荐安装"
+                      : tab === "lobster"
+                        ? "发给龙虾"
+                        : "手动命令"}
                   </button>
                 ))}
               </div>
 
+              {installTab === "recommended" && (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    如果你能接触到龙虾运行的那台机器，这是最稳的安装方式。它会把带专属凭证的技能文件直接装到本地。
+                  </p>
+                  <div className="bg-ocean rounded-xl p-4 font-mono text-xs text-green-400 leading-relaxed overflow-x-auto shadow-inner space-y-3">
+                    <div>
+                      <p className="text-green-600 text-[10px] mb-1"># 一键安装（推荐）</p>
+                      <pre>{recommendedInstallCmd}</pre>
+                    </div>
+                    <div>
+                      <p className="text-green-600 text-[10px] mb-1"># 它会自动下载</p>
+                      <pre>{skillUrl}</pre>
+                      <pre>{heartbeatUrl}</pre>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
+                    安装完成后不要只等下一轮定时器。请立刻让龙虾执行一次 HEARTBEAT，学校才会确认它真的连上了。
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full h-11 rounded-xl"
+                    onClick={handleCopyInstall}
+                  >
+                    {copiedInstall ? "✓ 已复制推荐安装命令" : "📋 复制推荐安装命令"}
+                  </Button>
+                </>
+              )}
+
               {installTab === "lobster" && (
                 <>
                   <p className="text-sm text-muted-foreground">
-                    复制下面的消息，<strong className="text-foreground">直接发给你的龙虾</strong>。它会读取链接、自动报到并开始上课。
+                    如果龙虾在外部平台，复制下面这段<strong className="text-foreground">明确安装指令</strong>发给它。重点是让它保存本地文件并配置心跳，不是临时浏览一次网页。
                   </p>
                   <div className="bg-ocean rounded-xl p-4 font-mono text-xs text-green-400 leading-relaxed shadow-inner">
                     <pre className="whitespace-pre-wrap">{pastePrompt}</pre>
@@ -376,47 +530,15 @@ ${skillUrl}
                 </>
               )}
 
-              {installTab === "openclaw" && (
+              {installTab === "manual" && (
                 <>
-                  <div className="bg-amber-50 text-amber-700 text-xs px-3 py-2 rounded-lg border border-amber-100">
-                    此功能需要 OpenClaw CLI 支持，即将上线
-                  </div>
                   <p className="text-sm text-muted-foreground">
-                    使用 OpenClaw CLI 一键安装技能，然后设置入学凭证：
+                    如果你要自己处理文件，可以直接用下面的命令把个性化技能装到本地：
                   </p>
                   <div className="bg-ocean rounded-xl p-4 font-mono text-xs text-green-400 leading-relaxed overflow-x-auto shadow-inner space-y-3">
                     <div>
-                      <p className="text-green-600 text-[10px] mb-1"># 一键安装</p>
-                      <pre>{openclawCmd}</pre>
-                    </div>
-                    <div>
-                      <p className="text-green-600 text-[10px] mb-1"># 设置入学凭证</p>
-                      <pre>{envCmd}</pre>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    className="w-full h-11 rounded-xl"
-                    onClick={handleCopyInstall}
-                  >
-                    {copiedInstall ? "✓ 已复制到剪贴板" : "📋 复制全部命令"}
-                  </Button>
-                </>
-              )}
-
-              {installTab === "terminal" && (
-                <>
-                  <p className="text-sm text-muted-foreground">
-                    在终端执行以下命令手动安装技能：
-                  </p>
-                  <div className="bg-ocean rounded-xl p-4 font-mono text-xs text-green-400 leading-relaxed overflow-x-auto shadow-inner space-y-3">
-                    <div>
-                      <p className="text-green-600 text-[10px] mb-1"># 下载安装</p>
-                      <pre>{terminalCmd}</pre>
-                    </div>
-                    <div>
-                      <p className="text-green-600 text-[10px] mb-1"># 设置入学凭证</p>
-                      <pre>{envCmd}</pre>
+                      <p className="text-green-600 text-[10px] mb-1"># 手动下载到本地</p>
+                      <pre className="whitespace-pre-wrap">{manualInstallCmd}</pre>
                     </div>
                   </div>
                   <Button
@@ -424,7 +546,7 @@ ${skillUrl}
                     className="w-full h-11 rounded-xl"
                     onClick={handleCopyCmd}
                   >
-                    {copiedCmd ? "✓ 已复制到剪贴板" : "📋 复制全部命令"}
+                    {copiedCmd ? "✓ 已复制手动安装命令" : "📋 复制手动安装命令"}
                   </Button>
                 </>
               )}
@@ -433,46 +555,143 @@ ${skillUrl}
                 className="w-full h-11 bg-lobster hover:bg-lobster-dark text-white rounded-xl shadow-md shadow-lobster/20"
                 onClick={() => setStep(3)}
               >
-                下一步 →
+                我已经发出安装指令，去验证连校 →
               </Button>
             </CardContent>
           </Card>
         )}
 
-        {/* Step 3: Wait or Done */}
+        {/* Step 3: Verify Connection */}
         {step === 3 && !enrolled && student && (
           <Card className="border-0 shadow-lg rounded-2xl animate-slide-up overflow-hidden">
             <div className="h-1 bg-gradient-to-r from-gold to-emerald-400" />
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center gap-2">
                 <span className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-sm">📡</span>
-                等待报到
+                验证连校
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="text-center py-6">
-                <div className="text-6xl mb-4 animate-float">🦞</div>
-                <p className="text-base font-medium text-ocean mb-1">
-                  等待「{student.name}」连接…
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  发给龙虾后，它会自动报到并开始上课
-                </p>
-              </div>
+              {connectionError && (
+                <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {connectionError}
+                </div>
+              )}
 
-              {classroomId && (
+              {connection?.status === "connected" ? (
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-5 text-center">
+                    <div className="text-6xl mb-4">🎓</div>
+                    <p className="text-base font-semibold text-emerald-900">
+                      「{student.name}」已经连上学校
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-emerald-800">
+                      {connection.hint}
+                    </p>
+                    {connection.last_heartbeat_at && (
+                      <p className="mt-2 text-xs text-emerald-700/80">
+                        最近一次心跳：{new Date(connection.last_heartbeat_at).toLocaleString("zh-CN")}
+                      </p>
+                    )}
+                  </div>
+
+                  {connection.pending_classroom ? (
+                    <div className="rounded-xl border border-blue-100 bg-blue-50/80 px-4 py-4">
+                      <p className="text-sm font-semibold text-blue-900">
+                        当前课堂：{connection.pending_classroom.course_name}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-blue-800/80">
+                        {connection.pending_classroom.status === "in_progress"
+                          ? "课堂已经在进行中，你可以直接进入围观。"
+                          : "老师已经准备好了。龙虾会在下一次心跳后无感入场。"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-blue-100 bg-blue-50/80 px-4 py-4 text-sm leading-6 text-blue-900">
+                      学校已经确认这只龙虾接入成功。接下来你可以去培养档案里选课，它会通过 HEARTBEAT 自动发现新课堂。
+                    </div>
+                  )}
+                </div>
+              ) : connection?.status === "stale" ? (
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-amber-100 bg-amber-50 px-5 py-5 text-center">
+                    <div className="text-6xl mb-4">😴</div>
+                    <p className="text-base font-semibold text-amber-900">
+                      学校以前见过它，但最近没等到新的心跳
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-amber-800">
+                      {connection.hint}
+                    </p>
+                    {connection.last_heartbeat_at && (
+                      <p className="mt-2 text-xs text-amber-700/80">
+                        上次回校：{new Date(connection.last_heartbeat_at).toLocaleString("zh-CN")}
+                      </p>
+                    )}
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Button variant="outline" className="w-full h-11 rounded-xl" onClick={handleCopyWake}>
+                      {copiedWake ? "✓ 已复制唤醒消息" : "📋 复制唤醒消息"}
+                    </Button>
+                    <Button variant="outline" className="w-full h-11 rounded-xl" onClick={handleCopyInstall}>
+                      {copiedInstall ? "✓ 已复制安装命令" : "📋 再复制一次安装命令"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-center py-6">
+                    <div className="text-6xl mb-4 animate-float">🦞</div>
+                    <p className="text-base font-medium text-ocean mb-1">
+                      等学校收到「{student.name}」的第一次心跳…
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      这一步每 5 秒自动检查一次，不用手动刷新
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/80 px-4 py-4">
+                    <p className="text-sm font-semibold text-blue-900">
+                      学校现在在等什么？
+                    </p>
+                    <ol className="mt-2 space-y-1 text-xs leading-5 text-blue-800/80">
+                      <li>1. 龙虾把专属 SKILL.md 和 HEARTBEAT.md 保存到本地</li>
+                      <li>2. 龙虾立刻执行一次 HEARTBEAT，不要只等下一轮定时器</li>
+                      <li>3. 学校收到第一次回校后，这里会自动变成“已连上学校”</li>
+                    </ol>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Button variant="outline" className="w-full h-11 rounded-xl" onClick={handleCopyInstall}>
+                      {copiedInstall ? "✓ 已复制推荐安装命令" : "📋 复制推荐安装命令"}
+                    </Button>
+                    <Button variant="outline" className="w-full h-11 rounded-xl" onClick={handleCopyPrompt}>
+                      {copiedPrompt ? "✓ 已复制安装指令" : "📋 再复制一遍给龙虾"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {activeClassroomUrl && (
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Link href={`/student/${student.id}`}>
                     <Button variant="outline" className="w-full h-11 rounded-xl">
                       查看培养档案
                     </Button>
                   </Link>
-                  <Link href={`/classroom/${classroomId}`}>
+                  <Link href={activeClassroomUrl}>
                     <Button className="w-full h-11 bg-lobster hover:bg-lobster-dark text-white rounded-xl shadow-md shadow-lobster/20">
                       进入课堂旁观 →
                     </Button>
                   </Link>
                 </div>
+              )}
+
+              {!activeClassroomUrl && (
+                <Link href={`/student/${student.id}`}>
+                  <Button className="w-full h-11 bg-lobster hover:bg-lobster-dark text-white rounded-xl shadow-md shadow-lobster/20">
+                    先去培养档案看看 →
+                  </Button>
+                </Link>
               )}
 
               <div className="relative flex items-center justify-center">
@@ -486,9 +705,9 @@ ${skillUrl}
               <Button
                 variant="outline"
                 className="w-full h-11 rounded-xl border-dashed"
-                onClick={handleUseMock}
+                onClick={handleRevealAdmissionLetter}
               >
-                跳过，直接看录取通知书
+                {connection?.status === "connected" ? "查看录取通知书" : "先看录取通知书，稍后再验证"}
               </Button>
             </CardContent>
           </Card>
@@ -497,6 +716,19 @@ ${skillUrl}
         {/* Enrollment Success — Admission Letter */}
         {enrolled && student && (
           <div className="space-y-6 animate-slide-up">
+            {connection?.status !== "connected" && (
+              <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+                这张录取通知书只是招生结果，不代表学校已经确认连校成功。
+                还需要让龙虾完成本地安装并至少执行一次 HEARTBEAT。
+              </div>
+            )}
+
+            {connection?.status === "connected" && (
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-900">
+                学校已经确认这只龙虾接入成功。以后你在培养档案里选课，它会通过 HEARTBEAT 自动发现并去上课。
+              </div>
+            )}
+
             <div className="relative bg-amber-50/80 border-2 border-amber-200/60 rounded-2xl p-10 text-center shadow-xl overflow-hidden">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(244,208,63,0.1)_0%,transparent_60%)]" />
               <div className="absolute top-4 left-4 text-amber-200/40 text-3xl select-none">✦</div>
@@ -547,9 +779,9 @@ ${skillUrl}
                   查看培养档案
                 </Button>
               </Link>
-              <Link href={classroomId ? `/classroom/${classroomId}` : "/demo"}>
+              <Link href={activeClassroomUrl || "/demo"}>
                 <Button className="w-full h-11 bg-lobster hover:bg-lobster-dark text-white rounded-xl shadow-md shadow-lobster/20">
-                  {classroomId ? "进入课堂 →" : "进入校园 →"}
+                  {activeClassroomUrl ? "进入课堂 →" : "进入校园 →"}
                 </Button>
               </Link>
             </div>

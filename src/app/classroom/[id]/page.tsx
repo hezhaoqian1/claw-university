@@ -32,6 +32,7 @@ interface ClassroomData {
 
 interface EvaluationData {
   ready: boolean;
+  claimed_at?: string | null;
   evaluation?: {
     total_score: number;
     grade: string;
@@ -46,6 +47,14 @@ interface EvaluationData {
       value?: string;
       reason: string;
     }> | null;
+    homework?: {
+      id: string;
+      title: string;
+      description: string;
+      dueAt: string;
+      status: string;
+      submittedAt: string | null;
+    } | null;
   };
 }
 
@@ -252,6 +261,7 @@ export default function ClassroomPage() {
       : status === "waiting_join"
         ? "scheduled"
         : "in_progress";
+  const skillActionsClaimed = Boolean(evaluation?.claimed_at);
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -387,13 +397,27 @@ export default function ClassroomPage() {
               {evaluation.evaluation.skill_actions?.length ? (
                 <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 mb-3">
                   <p className="text-xs font-bold text-emerald-700 mb-2">
-                    课后技能操作
+                    {skillActionsClaimed
+                      ? "老师发放的新能力（龙虾已领取并安装）"
+                      : "老师发放的新能力（龙虾会自动安装）"}
+                  </p>
+                  <p className="mb-3 text-xs leading-5 text-emerald-800/80">
+                    {skillActionsClaimed
+                      ? "这份能力奖励已经被龙虾处理完成，学校记录也已认领。"
+                      : "这不是让你手动处理的待办。龙虾会在处理课后结果时自动领取；如果长时间没动静，优先检查学校连接。 "}
                   </p>
                   <div className="space-y-2 text-sm text-emerald-900">
                     {evaluation.evaluation.skill_actions.map((action) => (
                       <div key={`${action.type}-${action.name}`}>
                         <p className="font-medium">
-                          {action.type === "install_skill" ? "安装技能" : "追加配置"}：{action.name}
+                          {action.type === "install_skill"
+                            ? skillActionsClaimed
+                              ? "已安装技能"
+                              : "待龙虾自动安装的技能"
+                            : skillActionsClaimed
+                              ? "已追加配置"
+                              : "待龙虾自动写入的配置"}
+                          ：{action.name}
                         </p>
                         <p className="text-xs leading-5 text-emerald-800/80">
                           {action.reason}
@@ -401,6 +425,28 @@ export default function ClassroomPage() {
                       </div>
                     ))}
                   </div>
+                </div>
+              ) : null}
+
+              {evaluation.evaluation.homework ? (
+                <div className="bg-violet-50 border border-violet-100 rounded-xl p-4 mb-3">
+                  <p className="text-xs font-bold text-violet-700 mb-2">
+                    课后作业（学校已建档追踪）
+                  </p>
+                  <p className="text-sm font-medium text-violet-950">
+                    {evaluation.evaluation.homework.title}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-violet-900 whitespace-pre-wrap">
+                    {evaluation.evaluation.homework.description}
+                  </p>
+                  <p className="mt-3 text-xs text-violet-700/90">
+                    截止：{new Date(evaluation.evaluation.homework.dueAt).toLocaleString("zh-CN")}
+                    {" · "}
+                    状态：
+                    {evaluation.evaluation.homework.status === "submitted"
+                      ? "已提交，待老师批改"
+                      : "待龙虾提交"}
+                  </p>
                 </div>
               ) : null}
 

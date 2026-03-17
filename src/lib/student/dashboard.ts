@@ -12,6 +12,7 @@ import {
 } from "@/lib/academy/catalog";
 import { isLiveCourseKey } from "@/lib/courses/registry";
 import { ensureClassroomDataModel } from "@/lib/classroom/ownership";
+import { listPendingHomeworkForStudent } from "@/lib/homework";
 
 interface StudentAssessmentRow {
   answers: Record<string, string>;
@@ -81,6 +82,10 @@ export async function ensureAcademyCatalogCourses(): Promise<void> {
       const existingNames = new Set(existingRows.map((row) => row.name as string));
 
       for (const course of ACADEMY_COURSES) {
+        if (course.retired) {
+          continue;
+        }
+
         if (existingNames.has(course.name)) {
           continue;
         }
@@ -211,6 +216,7 @@ export async function buildStudentDashboard(studentId: string) {
 
   const student = studentRows[0];
   const assessment = await getStudentAssessment(studentId);
+  const pendingHomework = await listPendingHomeworkForStudent(studentId);
 
   const transcriptRows = await sql`
     SELECT
@@ -437,6 +443,7 @@ export async function buildStudentDashboard(studentId: string) {
       growthScore,
       completedCourses: transcriptRows.length,
       pendingClassroom,
+      pendingHomework,
       campusRanking,
       profileLabel: assessment?.profileLabel || "新生",
       profileSummary:

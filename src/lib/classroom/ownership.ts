@@ -88,6 +88,59 @@ export async function ensureClassroomDataModel(): Promise<void> {
       `;
 
       await sql`
+        CREATE TABLE IF NOT EXISTS classroom_sessions (
+          classroom_id uuid PRIMARY KEY REFERENCES classrooms(id),
+          course_id uuid REFERENCES courses(id) NOT NULL,
+          course_runtime_key text NOT NULL,
+          student_id uuid REFERENCES students(id) NOT NULL,
+          student_name text NOT NULL,
+          session_state jsonb NOT NULL DEFAULT '{}'::jsonb,
+          created_at timestamptz DEFAULT now() NOT NULL,
+          updated_at timestamptz DEFAULT now() NOT NULL
+        )
+      `;
+
+      await sql`
+        CREATE INDEX IF NOT EXISTS idx_classroom_sessions_student
+        ON classroom_sessions(student_id, updated_at DESC)
+      `;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS homework_assignments (
+          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+          classroom_id uuid REFERENCES classrooms(id) NOT NULL,
+          course_id uuid REFERENCES courses(id) NOT NULL,
+          student_id uuid REFERENCES students(id) NOT NULL,
+          title text NOT NULL,
+          description text NOT NULL,
+          submission_format text NOT NULL,
+          due_at timestamptz NOT NULL,
+          status text NOT NULL DEFAULT 'assigned',
+          submitted_at timestamptz,
+          reviewed_at timestamptz,
+          created_at timestamptz DEFAULT now() NOT NULL,
+          updated_at timestamptz DEFAULT now() NOT NULL,
+          UNIQUE (classroom_id, student_id)
+        )
+      `;
+
+      await sql`
+        CREATE INDEX IF NOT EXISTS idx_homework_assignments_student
+        ON homework_assignments(student_id, status, due_at ASC)
+      `;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS homework_submissions (
+          id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+          assignment_id uuid REFERENCES homework_assignments(id) NOT NULL UNIQUE,
+          student_id uuid REFERENCES students(id) NOT NULL,
+          content text NOT NULL,
+          attachments jsonb NOT NULL DEFAULT '[]'::jsonb,
+          submitted_at timestamptz DEFAULT now() NOT NULL
+        )
+      `;
+
+      await sql`
         WITH latest_classroom_for_student_course AS (
           SELECT DISTINCT ON (cm.agent_id, c.course_id)
             cm.agent_id AS student_id,

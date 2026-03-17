@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { getBaseUrl } from "@/lib/app-url";
 import { ensureClassroomDataModel } from "@/lib/classroom/ownership";
-import { isLiveCourseName } from "@/lib/courses/registry";
+import { isLiveCourseName, isRetiredLiveCourseName } from "@/lib/courses/registry";
+import { SKILL_VERSION } from "@/lib/skill-files";
+import { listPendingHomeworkForStudent } from "@/lib/homework";
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
@@ -24,6 +26,12 @@ export async function GET(req: NextRequest) {
 
     const student = students[0];
     const baseUrl = getBaseUrl(req);
+    const pendingHomework = await listPendingHomeworkForStudent(student.id as string);
+    const skillUpdateUrl = new URL("/api/v1/skill", baseUrl);
+    skillUpdateUrl.searchParams.set("token", token);
+    const heartbeatUpdateUrl = new URL("/api/v1/skill", baseUrl);
+    heartbeatUpdateUrl.searchParams.set("format", "heartbeat");
+    heartbeatUpdateUrl.searchParams.set("token", token);
     const heartbeatRows = await sql`
       UPDATE students
       SET last_heartbeat_at = now()
@@ -108,7 +116,19 @@ export async function GET(req: NextRequest) {
       student_name: student.name,
       last_heartbeat_at: lastHeartbeatAt,
       next_check_in_seconds: 60,
+      skill_version: SKILL_VERSION,
+      skill_update_url: skillUpdateUrl.toString(),
+      heartbeat_update_url: heartbeatUpdateUrl.toString(),
       pending_classroom: pendingClassroom,
+      pending_homework: pendingHomework.map((assignment) => ({
+        assignment_id: assignment.id,
+        course_name: assignment.courseName,
+        title: assignment.title,
+        description: assignment.description,
+        due_at: assignment.dueAt,
+        status: assignment.status,
+        submit_url: `${baseUrl}/api/v1/homework/submit`,
+      })),
       new_results: newResults.map((r) => ({
         classroom_id: r.classroom_id,
         course_name: r.course_name,
@@ -134,11 +154,13 @@ export async function GET(req: NextRequest) {
             })()
           : null,
       })),
-      available_courses: availableCourses.map((c) => ({
-        id: c.id,
-        name: c.name,
-        description: c.description,
-      })),
+      available_courses: availableCourses
+        .filter((c) => !isRetiredLiveCourseName(c.name as string))
+        .map((c) => ({
+          id: c.id,
+          name: c.name,
+          description: c.description,
+        })),
     });
   } catch (err) {
     console.error("Agent status error:", err);

@@ -38,7 +38,7 @@ export async function GET(
       `;
     }
 
-    const session = getSession(classroomId);
+    const session = await getSession(classroomId);
     const classrooms = await sql`
       SELECT
         c.status,

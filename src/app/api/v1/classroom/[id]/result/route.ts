@@ -5,6 +5,7 @@ import {
   ensureClassroomDataModel,
   resolveClassroomStudent,
 } from "@/lib/classroom/ownership";
+import { getHomeworkForClassroomStudent } from "@/lib/homework";
 
 export async function GET(
   req: NextRequest,
@@ -19,7 +20,7 @@ export async function GET(
   try {
     await ensureClassroomDataModel();
 
-    const session = getSession(classroomId);
+    const session = await getSession(classroomId);
 
     if (session && session.status !== "completed") {
       return NextResponse.json({
@@ -105,6 +106,8 @@ export async function GET(
       LIMIT 1
     `;
 
+    const homework = await getHomeworkForClassroomStudent(classroomId, studentId);
+
     if (transcripts.length > 0) {
       let claimedAt = transcripts[0].claimed_at;
 
@@ -132,6 +135,7 @@ export async function GET(
           memory_delta: t.memory_delta,
           soul_suggestion: t.soul_suggestion,
           skill_actions: t.skill_actions,
+          homework,
         },
       });
     }
@@ -140,7 +144,10 @@ export async function GET(
       return NextResponse.json({
         ready: true,
         claimed_at: null,
-        evaluation: session.finalEvaluation,
+        evaluation: {
+          ...session.finalEvaluation,
+          homework,
+        },
       });
     }
 

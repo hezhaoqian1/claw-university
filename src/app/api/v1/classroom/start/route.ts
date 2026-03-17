@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let session = getSession(classroomId);
+    let session = await getSession(classroomId);
     if (!session) {
       if (classroomStatus === "in_progress") {
         return NextResponse.json(

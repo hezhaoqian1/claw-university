@@ -17,7 +17,7 @@ export async function POST(
       );
     }
 
-    const session = getSession(classroomId);
+    const session = await getSession(classroomId);
     if (!session) {
       return NextResponse.json(
         { error: "Classroom not found or not active" },
@@ -40,7 +40,7 @@ export async function POST(
       });
     }
 
-    handleStudentResponse(classroomId, content);
+    await handleStudentResponse(classroomId, content);
 
     return NextResponse.json({
       accepted: true,

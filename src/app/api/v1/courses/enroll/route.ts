@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     const classroom = await ensureStudentClassroom(student.id, course.id);
     const classroomId = classroom.classroomId;
 
-    let session = getSession(classroomId);
+    let session = await getSession(classroomId);
 
     if (!session) {
       if (classroom.classroomStatus === "in_progress") {

@@ -46,6 +46,14 @@ interface StudentDashboardData {
       courseName: string;
       classroomUrl: string;
     } | null;
+    pendingHomework: Array<{
+      id: string;
+      courseName: string;
+      title: string;
+      description: string;
+      dueAt: string;
+      status: string;
+    }>;
     campusRanking: {
       rank: number | null;
       total: number;
@@ -480,6 +488,28 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                       查看入学凭证
                     </Button>
                   </Link>
+                </div>
+              )}
+
+              {dashboard.growth.pendingHomework.length > 0 && (
+                <div className="mt-4 rounded-[22px] border border-violet-100 bg-violet-50/80 p-4">
+                  <p className="text-sm font-semibold text-violet-900">课后作业</p>
+                  <div className="mt-3 space-y-3">
+                    {dashboard.growth.pendingHomework.slice(0, 2).map((homework) => (
+                      <div key={homework.id} className="rounded-2xl bg-white/90 p-4 shadow-sm">
+                        <p className="text-sm font-medium text-ocean">
+                          {homework.courseName} · {homework.title}
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          {homework.description}
+                        </p>
+                        <p className="mt-2 text-xs text-violet-700">
+                          截止：{formatDate(homework.dueAt)} · 状态：
+                          {homework.status === "submitted" ? "已提交，待老师查看" : "待龙虾提交"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
