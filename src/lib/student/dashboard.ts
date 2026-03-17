@@ -322,7 +322,7 @@ export async function buildStudentDashboard(studentId: string) {
   const completedCourseNames = new Set(
     transcriptRows.map((row) => row.course_name as string)
   );
-  const immediateCourses = buildImmediateRecommendations(traitScores, 4).map((course) => ({
+  const immediateCourses = buildImmediateRecommendations(traitScores, 99).map((course) => ({
     ...course,
     ...(function buildImmediateCourseAction() {
       const pendingCourse = pendingClassroomByCourseName.get(course.name) || null;
