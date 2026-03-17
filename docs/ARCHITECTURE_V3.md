@@ -12,13 +12,16 @@ The non-course groundwork described in this document is now shipped:
 - heartbeat-driven lobster join via `pending_classroom`
 - dashboard agent presence states and classroom redirect flow
 - `HEARTBEAT.md` / `SKILL.md` protocol updates
+- SKILL self-update metadata and overwrite flow
+- persistent classroom runtime state via `classroom_sessions`
+- tracked homework assignments and submissions
+- post-class notify-before-claim loop with owner-facing recap
 
 Still intentionally not implemented in this slice:
 
 - automatic course enrollment / auto-study
-- SKILL self-update
 - scheduled cohort orchestration
-- persistent classroom runtime state across server restarts
+- push wake-up for external lobsters
 
 ## 1. Why This Document Exists
 
@@ -1024,10 +1027,8 @@ Not included in this document's implementation scope:
 
 - automatic recommended course enrollment
 - auto-study owner toggle
-- SKILL self-update system
 - true push wake-up for external lobsters
 - multi-lobster synchronized cohort runtime
-- full classroom-state persistence across service restarts
 
 These may come later, but shipping the v3 owner-controlled loop is more important.
 

@@ -55,3 +55,6 @@
 - The least destructive fix is to add a second receipt timestamp (`owner_notified_at`) instead of redefining `claimed_at`; old clients keep working while new clients can prove owner-facing delivery.
 - Heartbeat should return a ready-to-say `recap_text`; otherwise every lobster improvises the owner message differently and some will dodge the responsibility entirely.
 - If `notify_url` is introduced, it must be returned consistently by `result`, `start`, and `join`; documenting a URL the API does not actually emit would be self-inflicted protocol rot.
+- Current course scripts were already hinting at homework in teacher dialogue, but runtime logic only persisted homework for `maliang-101`; that mismatch is why the lobster still drifted into "should I do it?" behavior after other classes.
+- The clean design is not "let the lobster invent a next step"; it is "every runtime yields a homework template, and future runtimes get a boring fallback instead of freedom to hallucinate".
+- Homework protocol must treat ordinary class assignments like normal execution work: do first, then show the owner, instead of asking for permission to do basic after-class practice.

@@ -10,7 +10,7 @@ import {
   markEnrollmentJoined,
   upsertClassroomEnrollment,
 } from "@/lib/classroom/ownership";
-import { getCourseRuntimeByKey } from "@/lib/courses/registry";
+import { getCourseRuntimeByKey, resolveCourseHomework } from "@/lib/courses/registry";
 import { assignHomework } from "@/lib/homework";
 import type { LectureStep } from "@/types";
 
@@ -402,14 +402,12 @@ async function finishSession(classroomId: string): Promise<void> {
         completed_at = now()
     `;
 
-    if (runtime.homework) {
-      await assignHomework({
-        classroomId,
-        courseId: session.courseId,
-        studentId: session.studentId,
-        homework: runtime.homework,
-      });
-    }
+    await assignHomework({
+      classroomId,
+      courseId: session.courseId,
+      studentId: session.studentId,
+      homework: resolveCourseHomework(runtime),
+    });
 
     session.status = "completed";
     await persistSession(session);

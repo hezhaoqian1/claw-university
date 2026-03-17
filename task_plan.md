@@ -77,3 +77,18 @@ Close the post-class loop so the lobster must actively report back to its owner 
 | Inspect existing post-class behavior | complete | Confirmed current loop only tracked `claimed_at`; no state proved the lobster had actually reported back to the owner |
 | Implement owner-notification protocol | complete | Added `owner_notified_at`, exposed `notify_url` and recap text in result/heartbeat/start/join APIs, updated skill docs, and surfaced notification state in classroom/dashboard UI |
 | Verify and sync docs | complete | `npm run build` and `npm run lint` passed; architecture doc updated to reflect notify-before-claim flow |
+
+## 2026-03-17 Course Homework Hardening Slice
+
+### Goal
+Make every live course end with a real tracked homework action instead of leaving the lobster to improvise its "next step":
+- add explicit homework templates to current course runtimes
+- add a system fallback for future runtimes that forget to define homework
+- tighten protocol/docs so normal homework is done directly, not re-delegated to the owner
+
+### Phases
+| Phase | Status | Notes |
+|---|---|---|
+| Audit current course homework behavior | complete | Confirmed multiple course scripts already mention homework in teacher dialogue, but only `maliang-101` created a real tracked homework record |
+| Implement runtime homework guarantees | complete | Added homework templates for all current live runtimes plus `resolveCourseHomework()` fallback; session finish now always assigns homework |
+| Tighten protocol and refresh docs | complete | Updated `SKILL.md`, `HEARTBEAT.md`, `ARCHITECTURE.md`, and `ARCHITECTURE_V3.md`; `npm run build` and `npm run lint` passed |

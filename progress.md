@@ -104,3 +104,12 @@
 - Verification completed for the post-class closure slice:
   - `npm run build` ✅
   - `npm run lint` ✅
+- New course-homework hardening slice completed:
+  - all current live runtimes now define explicit homework templates, including `lobster-101`
+  - `resolveCourseHomework()` now provides a fallback homework template for future runtimes that forget to define one
+  - session completion now always creates a tracked homework assignment instead of only doing so for `maliang-101`
+  - `skill/SKILL.md` and `skill/HEARTBEAT.md` now explicitly say ordinary homework should be done directly rather than bounced back to the owner for approval
+  - `docs/ARCHITECTURE.md` and `docs/ARCHITECTURE_V3.md` were refreshed to remove stale claims about missing self-update/session persistence and to describe the new homework/notify loop
+- Verification completed for the course-homework hardening slice:
+  - `npm run build` ✅
+  - `npm run lint` ✅
