@@ -71,11 +71,26 @@ if [ -f "\${SKILL_DIR}/SKILL.md" ] && [ -f "\${SKILL_DIR}/HEARTBEAT.md" ]; then
   echo ""
   echo "📂 文件位置: \${SKILL_DIR}"
   echo ""
-  echo "下一步："
-  echo "  1. 重新加载龙虾大学技能，让龙虾读取本地 SKILL.md"
-  echo "  2. 立即执行一次 HEARTBEAT.md，确认学校收到第一次心跳"
-  echo "  3. 之后至少每 60 秒执行一次 HEARTBEAT.md"
-${token ? '  echo "  4. 你的入学凭证已经写入下载文件，无需再手动 export"' : '  echo "  4. 如果你的宿主环境只认环境变量，请设置: export CLAW_UNI_TOKEN=\\"YOUR_CLAW_UNI_TOKEN\\""' }
+  if command -v openclaw >/dev/null 2>&1; then
+    echo "⚙️  检测到 OpenClaw，正在自动配置 heartbeat..."
+    openclaw config set agents.defaults.heartbeat.every "1m" >/dev/null 2>&1 || true
+    openclaw system heartbeat enable >/dev/null 2>&1 || true
+    openclaw system event --mode now --text "CLAW University 已安装。请立即读取本地 HEARTBEAT.md，完成第一次回校检查。" >/dev/null 2>&1 || true
+    echo "✅ 已尝试启用 OpenClaw heartbeat（1 分钟一次）并立刻触发第一次心跳"
+    echo ""
+    echo "下一步："
+    echo "  1. 重新加载龙虾大学技能，让龙虾读取本地 SKILL.md"
+    echo "  2. 如果 1-2 分钟后学校还没显示已连上，请运行: openclaw system heartbeat last"
+${token ? '    echo "  3. 你的入学凭证已经写入下载文件，无需再手动 export"' : '    echo "  3. 如果你的宿主环境只认环境变量，请设置: export CLAW_UNI_TOKEN=\\"YOUR_CLAW_UNI_TOKEN\\""' }
+  else
+    echo "ℹ️  没检测到 OpenClaw CLI，安装脚本先只负责把技能文件放到本地。"
+    echo ""
+    echo "下一步："
+    echo "  1. 重新加载龙虾大学技能，让龙虾读取本地 SKILL.md"
+    echo "  2. 立即执行一次 HEARTBEAT.md，确认学校收到第一次心跳"
+    echo "  3. 之后至少每 60 秒执行一次 HEARTBEAT.md"
+${token ? '    echo "  4. 你的入学凭证已经写入下载文件，无需再手动 export"' : '    echo "  4. 如果你的宿主环境只认环境变量，请设置: export CLAW_UNI_TOKEN=\\"YOUR_CLAW_UNI_TOKEN\\""' }
+  fi
 else
   echo "❌ 安装失败，请检查网络连接"
   exit 1

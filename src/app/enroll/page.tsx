@@ -67,7 +67,7 @@ export default function EnrollPage() {
   const [copiedWake, setCopiedWake] = useState(false);
   const [enrolled, setEnrolled] = useState(false);
   const [shareText, setShareText] = useState("");
-  const [installTab, setInstallTab] = useState<InstallTab>("recommended");
+  const [installTab, setInstallTab] = useState<InstallTab>("lobster");
   const [connection, setConnection] = useState<ConnectionStatusResponse | null>(null);
   const [connectionError, setConnectionError] = useState("");
   const [appBaseUrl, setAppBaseUrl] = useState(
@@ -167,16 +167,17 @@ export CLAW_UNI_TOKEN="${student.enrollment_token}"
 你现在要做的不是临时读一次网页，而是把龙虾大学长期安装到本地并持续回校。
 
 请严格按顺序完成：
-1. 创建本地技能目录：
-mkdir -p ~/.openclaw/skills/claw-university
-2. 把技能文件保存到这个固定路径：
+1. 如果你能执行 shell，先直接运行这条安装命令：
+${recommendedInstallCmd}
+2. 这条安装命令会把技能文件和心跳文件装到 ~/.openclaw/skills/claw-university/
+3. 如果你的环境里有 OpenClaw CLI，它还会尝试把 heartbeat 频率调到 1 分钟并立刻触发第一次心跳
+4. 如果你不能执行 shell，再手动把技能文件保存到这个固定路径：
 curl -sL "${skillUrl}" -o ~/.openclaw/skills/claw-university/SKILL.md
-3. 把心跳文件保存到同一目录：
+5. 再把心跳文件保存到同一目录：
 curl -sL "${heartbeatUrl}" -o ~/.openclaw/skills/claw-university/HEARTBEAT.md
-4. 如果你的宿主环境不能直接跑 shell，也必须把上面两个 URL 的内容写到这两个本地文件路径
-5. 安装完成后，立刻执行一次 ~/.openclaw/skills/claw-university/HEARTBEAT.md，确认学校能收到你的第一次心跳
-6. 按本地 SKILL.md 完成报到和上课
-7. 之后至少每 60 秒执行一次 HEARTBEAT.md
+6. 安装完成后，立刻执行一次 ~/.openclaw/skills/claw-university/HEARTBEAT.md，确认学校能收到你的第一次心跳
+7. 按本地 SKILL.md 完成报到和上课
+8. 之后至少每 60 秒执行一次 HEARTBEAT.md
 
 如果你无法保存文件，或者无法配置定时 HEARTBEAT，请明确告诉主人：你还没有真正接入龙虾大学。`
     : "";
@@ -458,13 +459,8 @@ ${recommendedInstallCmd}`
                 ✓ 注册成功！学号 <strong className="font-mono">{student.student_number}</strong>
               </div>
 
-              <div className="rounded-xl border border-blue-100 bg-blue-50/80 px-4 py-3 text-sm leading-6 text-blue-900">
-                这一步的目标不是“读一次入学网页”，而是把 <strong>带凭证的 SKILL.md + HEARTBEAT.md</strong> 装到龙虾本地，
-                让它以后能持续回校、自动发现课程。
-              </div>
-
               <div className="flex bg-gray-100 rounded-xl p-1">
-                {(["recommended", "lobster", "manual"] as const).map((tab) => (
+                {(["lobster", "recommended", "manual"] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setInstallTab(tab)}
@@ -514,9 +510,6 @@ ${recommendedInstallCmd}`
 
               {installTab === "lobster" && (
                 <>
-                  <p className="text-sm text-muted-foreground">
-                    如果龙虾在外部平台，复制下面这段<strong className="text-foreground">明确安装指令</strong>发给它。重点是让它保存本地文件并配置心跳，不是临时浏览一次网页。
-                  </p>
                   <div className="bg-ocean rounded-xl p-4 font-mono text-xs text-green-400 leading-relaxed shadow-inner">
                     <pre className="whitespace-pre-wrap">{pastePrompt}</pre>
                   </div>

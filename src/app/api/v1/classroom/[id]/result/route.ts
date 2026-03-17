@@ -6,6 +6,7 @@ import {
   resolveClassroomStudent,
 } from "@/lib/classroom/ownership";
 import { getHomeworkForClassroomStudent } from "@/lib/homework";
+import { normalizeSkillActions } from "@/lib/skill-actions";
 
 export async function GET(
   req: NextRequest,
@@ -134,7 +135,7 @@ export async function GET(
           comment_style: t.teacher_comment_style,
           memory_delta: t.memory_delta,
           soul_suggestion: t.soul_suggestion,
-          skill_actions: t.skill_actions,
+          skill_actions: normalizeSkillActions(t.skill_actions),
           homework,
         },
       });

@@ -5,6 +5,7 @@ import { ensureClassroomDataModel } from "@/lib/classroom/ownership";
 import { isLiveCourseName, isRetiredLiveCourseName } from "@/lib/courses/registry";
 import { SKILL_VERSION } from "@/lib/skill-files";
 import { listPendingHomeworkForStudent } from "@/lib/homework";
+import { normalizeSkillActions } from "@/lib/skill-actions";
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
@@ -137,7 +138,7 @@ export async function GET(req: NextRequest) {
         comment: r.teacher_comment,
         memory_delta: r.memory_delta,
         soul_suggestion: r.soul_suggestion,
-        skill_actions: r.skill_actions,
+        skill_actions: normalizeSkillActions(r.skill_actions),
         result_url: r.classroom_id
           ? (() => {
               const url = new URL(`/api/v1/classroom/${r.classroom_id}/result`, baseUrl);

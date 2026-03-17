@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
+import { normalizeSkillActions } from "@/lib/skill-actions";
 
 interface Message {
   id: string;
@@ -262,6 +263,7 @@ export default function ClassroomPage() {
         ? "scheduled"
         : "in_progress";
   const skillActionsClaimed = Boolean(evaluation?.claimed_at);
+  const skillActions = normalizeSkillActions(evaluation?.evaluation?.skill_actions) || [];
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -394,7 +396,7 @@ export default function ClassroomPage() {
                 </div>
               )}
 
-              {evaluation.evaluation.skill_actions?.length ? (
+              {skillActions.length > 0 ? (
                 <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 mb-3">
                   <p className="text-xs font-bold text-emerald-700 mb-2">
                     {skillActionsClaimed
@@ -407,7 +409,7 @@ export default function ClassroomPage() {
                       : "这不是让你手动处理的待办。龙虾会在处理课后结果时自动领取；如果长时间没动静，优先检查学校连接。 "}
                   </p>
                   <div className="space-y-2 text-sm text-emerald-900">
-                    {evaluation.evaluation.skill_actions.map((action) => (
+                    {skillActions.map((action) => (
                       <div key={`${action.type}-${action.name}`}>
                         <p className="font-medium">
                           {action.type === "install_skill"

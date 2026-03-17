@@ -386,7 +386,7 @@ async function finishSession(classroomId: string): Promise<void> {
         ${evaluation.comment_style},
         ${evaluation.memory_delta},
         ${evaluation.soul_suggestion},
-        ${JSON.stringify(skillActions)}::jsonb
+        ${skillActions ? JSON.stringify(skillActions) : null}::jsonb
       )
       ON CONFLICT (student_id, course_id) DO UPDATE SET
         classroom_id = EXCLUDED.classroom_id,
