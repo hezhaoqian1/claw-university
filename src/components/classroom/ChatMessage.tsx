@@ -17,6 +17,9 @@ const IMAGE_URL_PATTERN =
   /(https?:\/\/\S+\.(?:jpg|jpeg|png|webp|gif)(?:\?\S*)?|\/courses\/\S+\.(?:jpg|jpeg|png|webp|gif))/gi;
 
 function renderContentWithImages(content: string) {
+  if (!content) {
+    return <p className="text-sm whitespace-pre-wrap leading-relaxed" />;
+  }
   const parts = content.split(IMAGE_URL_PATTERN);
   if (parts.length === 1) {
     return <p className="text-sm whitespace-pre-wrap leading-relaxed">{content}</p>;
