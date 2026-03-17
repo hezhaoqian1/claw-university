@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { PostClassRecap } from "@/lib/post-class-recap";
 import {
   ArrowRight,
   BookOpen,
@@ -65,6 +66,7 @@ interface StudentDashboardData {
     strongestAcademy: string;
     weakestDimension: string;
   };
+  latestRecap: PostClassRecap | null;
   academies: Array<{
     id: string;
     name: string;
@@ -87,7 +89,9 @@ interface StudentDashboardData {
     commentStyle: string;
     memoryDelta: string | null;
     soulSuggestion: string | null;
+    ownerNotifiedAt?: string | null;
     completedAt: string;
+    recap: PostClassRecap;
   }>;
   recommendations: {
     immediateCourses: Array<{
@@ -520,7 +524,7 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
         <Tabs defaultValue={hasTranscripts ? "overview" : "courses"} className="mt-8 animate-slide-up-d3">
           <TabsList className="rounded-2xl bg-white/70 p-1 shadow-sm">
             <TabsTrigger value="overview" className="rounded-xl px-4">
-              成绩档案
+              最近带回来的
             </TabsTrigger>
             <TabsTrigger value="courses" className="rounded-xl px-4">
               推荐课程
@@ -532,11 +536,83 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="mt-4">
-            <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+            <div className="space-y-4">
+              {dashboard.latestRecap && dashboard.transcripts[0] ? (
+                <Card className="overflow-hidden rounded-[28px] border-white/80 bg-white/90 shadow-lg shadow-orange-100/30">
+                  <div className="h-1.5 bg-gradient-to-r from-lobster via-gold to-lobster" />
+                  <CardContent className="p-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className="rounded-full bg-lobster/10 text-lobster">
+                        它最近一次下课后带回来的东西
+                      </Badge>
+                      <Badge variant="outline" className="rounded-full bg-white/80">
+                        {dashboard.transcripts[0].courseName}
+                      </Badge>
+                      <Badge variant="outline" className="rounded-full bg-white/80 text-muted-foreground">
+                        {dashboard.transcripts[0].ownerNotifiedAt
+                          ? "它已经回来跟你说过了"
+                          : "它学完了，但还没正式回来汇报"}
+                      </Badge>
+                    </div>
+                    <p className="mt-4 text-lg font-semibold leading-8 text-ocean">
+                      {dashboard.latestRecap.intro}
+                    </p>
+                    <div className="mt-4 grid gap-3 xl:grid-cols-[1.1fr_0.9fr]">
+                      <div className="rounded-[22px] border border-blue-100 bg-blue-50/80 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700/90">
+                          {dashboard.latestRecap.takeawayTitle}
+                        </p>
+                        <div className="mt-3 space-y-2">
+                          {dashboard.latestRecap.takeaways.map((takeaway) => (
+                            <div
+                              key={takeaway}
+                              className="rounded-2xl bg-white/85 px-3 py-2 text-sm leading-6 text-blue-950"
+                            >
+                              {takeaway}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {dashboard.latestRecap.nextStepTitle && dashboard.latestRecap.nextStepBody ? (
+                        <div className="rounded-[22px] border border-violet-100 bg-violet-50/80 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700/90">
+                            {dashboard.latestRecap.nextStepTitle}
+                          </p>
+                          {dashboard.latestRecap.nextStepLabel ? (
+                            <p className="mt-3 text-sm font-semibold text-violet-950">
+                              {dashboard.latestRecap.nextStepLabel}
+                            </p>
+                          ) : null}
+                          <p className="mt-2 text-sm leading-6 text-violet-950/90">
+                            {dashboard.latestRecap.nextStepBody}
+                          </p>
+                          {dashboard.latestRecap.nextStepMeta ? (
+                            <p className="mt-3 text-xs leading-5 text-violet-700/85">
+                              {dashboard.latestRecap.nextStepMeta}
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                    {dashboard.transcripts[0].classroomId ? (
+                      <Link
+                        href={`/classroom/${dashboard.transcripts[0].classroomId}`}
+                        className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-lobster hover:text-lobster-dark"
+                      >
+                        去看它那节课的完整回放
+                        <ArrowRight className="size-4" />
+                      </Link>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              ) : null}
+
+              <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
               {/* Transcripts */}
               <Card className="rounded-[28px] border-white/80 bg-white/85 shadow-lg shadow-orange-100/30">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-ocean">课程成绩单</CardTitle>
+                  <CardTitle className="text-ocean">它每次下课带回来的话</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {dashboard.transcripts.length === 0 ? (
@@ -544,9 +620,9 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                       <div className="mx-auto mb-3 flex size-14 items-center justify-center rounded-full bg-lobster/10 text-2xl">
                         🦞
                       </div>
-                      <p className="font-medium text-ocean">还没有成绩单</p>
+                      <p className="font-medium text-ocean">它还没上完第一堂课</p>
                       <p className="mt-2 text-sm text-muted-foreground">
-                        龙虾上完第一堂课后，成绩和老师评语会出现在这里。
+                        等它第一次下课回来，这里就会开始留下痕迹。
                       </p>
                     </div>
                   ) : (
@@ -567,9 +643,17 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                           </div>
                         </div>
                         <Separator className="my-3" />
-                        <p className="text-sm leading-6 text-foreground/75">
-                          &ldquo;{transcript.comment}&rdquo;
-                        </p>
+                        <p className="text-sm leading-6 text-foreground/80">{transcript.recap.intro}</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {transcript.recap.takeaways.slice(0, 2).map((takeaway) => (
+                            <span
+                              key={takeaway}
+                              className="rounded-full bg-white px-3 py-1 text-xs text-muted-foreground shadow-sm"
+                            >
+                              {takeaway}
+                            </span>
+                          ))}
+                        </div>
                         {transcript.classroomId && (
                           <Link
                             href={`/classroom/${transcript.classroomId}`}
@@ -624,6 +708,7 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                 </CardContent>
               </Card>
             </div>
+            </div>
           </TabsContent>
 
           {/* Courses Tab */}
@@ -665,12 +750,12 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
               {/* Transcripts sidebar */}
               <Card className="rounded-[28px] border-white/80 bg-white/85 shadow-lg shadow-orange-100/30">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-ocean">已修课程记录</CardTitle>
+                  <CardTitle className="text-ocean">它最近的上课痕迹</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {dashboard.transcripts.length === 0 && (
                     <div className="rounded-[20px] border border-dashed border-gray-200 bg-gray-50/80 p-4 text-sm text-muted-foreground">
-                      还没有成绩单。龙虾的第一门课完成后，这里会开始出现成长痕迹。
+                      还没有课后痕迹。等第一堂课结束，这里就会开始有东西。
                     </div>
                   )}
 
@@ -691,9 +776,7 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                         </div>
                       </div>
                       <Separator className="my-3" />
-                      <p className="text-sm leading-6 text-foreground/75">
-                        &ldquo;{transcript.comment}&rdquo;
-                      </p>
+                      <p className="text-sm leading-6 text-foreground/80">{transcript.recap.intro}</p>
                     </div>
                   ))}
                 </CardContent>

@@ -62,3 +62,18 @@ Harden the live classroom loop and add real post-class homework tracking:
 | Inspect session and homework gaps | complete | Confirmed session runtime still lived only in memory and existing homework existed only as free-text script copy |
 | Implement persistence and homework data flow | complete | Added `classroom_sessions`, `homework_assignments`, `homework_submissions`, recovery-aware session runtime, homework assignment creation and submission API, retired old immediate courses from recommendation flow |
 | Verify and smoke test | complete | `npm run lint`, `npm run build`, and local route smoke checks for `/enroll`, `/api/v1/agent/status`, `/api/v1/homework/submit` all behaved as expected |
+
+## 2026-03-17 Post-class Owner Notification Slice
+
+### Goal
+Close the post-class loop so the lobster must actively report back to its owner after class instead of only writing internal memory:
+- add server-side observability for "owner has been told"
+- give heartbeat/results a ready-made recap payload plus notify receipt URL
+- update skill protocol so notify happens before claim
+
+### Phases
+| Phase | Status | Notes |
+|---|---|---|
+| Inspect existing post-class behavior | complete | Confirmed current loop only tracked `claimed_at`; no state proved the lobster had actually reported back to the owner |
+| Implement owner-notification protocol | complete | Added `owner_notified_at`, exposed `notify_url` and recap text in result/heartbeat/start/join APIs, updated skill docs, and surfaced notification state in classroom/dashboard UI |
+| Verify and sync docs | complete | `npm run build` and `npm run lint` passed; architecture doc updated to reflect notify-before-claim flow |

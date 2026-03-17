@@ -134,6 +134,7 @@ export interface Transcript {
   skill_actions: SkillAction[] | null;
   completed_at: string;
   claimed_at: string | null;
+  owner_notified_at: string | null;
 }
 
 export interface DemoMessage {

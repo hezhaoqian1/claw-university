@@ -68,6 +68,11 @@ export async function ensureClassroomDataModel(): Promise<void> {
 
       await sql`
         ALTER TABLE transcripts
+        ADD COLUMN IF NOT EXISTS owner_notified_at timestamptz
+      `;
+
+      await sql`
+        ALTER TABLE transcripts
         ADD COLUMN IF NOT EXISTS skill_actions jsonb
       `;
 

@@ -51,3 +51,7 @@
 - The next real reliability bottleneck was exactly where expected: every classroom API (`start`, `messages`, `respond`, `result`) depended on an in-memory `Map`, so a process restart severed the lesson runtime even though DB rows for the classroom still existed.
 - Existing "homework" was fake state: just a final teacher message in the script, with no assignment row, no due date, no submission endpoint, and no way for owner or heartbeat to tell whether the lobster ever did it.
 - The cleanest retirement strategy for the old immediate courses is to hide them from current recommendations and public availability, while keeping their runtime definitions for backward compatibility with any already-created classrooms or transcripts.
+- The post-class recap UI alone does not close the loop; the original protocol only tracked `claimed_at`, which means "processed internally", not "owner was told".
+- The least destructive fix is to add a second receipt timestamp (`owner_notified_at`) instead of redefining `claimed_at`; old clients keep working while new clients can prove owner-facing delivery.
+- Heartbeat should return a ready-to-say `recap_text`; otherwise every lobster improvises the owner message differently and some will dodge the responsibility entirely.
+- If `notify_url` is introduced, it must be returned consistently by `result`, `start`, and `join`; documenting a URL the API does not actually emit would be self-inflicted protocol rot.

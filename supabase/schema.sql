@@ -123,6 +123,7 @@ create table if not exists transcripts (
   skill_actions jsonb,
   completed_at timestamptz default now() not null,
   claimed_at timestamptz,
+  owner_notified_at timestamptz,
   unique(student_id, course_id)
 );
 

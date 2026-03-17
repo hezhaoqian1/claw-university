@@ -53,6 +53,9 @@ export async function POST(req: NextRequest) {
     const resultUrl = new URL(`/api/v1/classroom/${classroomId}/result`, baseUrl);
     resultUrl.searchParams.set("student_id", student.id);
 
+    const notifyUrl = new URL(resultUrl.toString());
+    notifyUrl.searchParams.set("notify", "1");
+
     const claimUrl = new URL(resultUrl.toString());
     claimUrl.searchParams.set("claim", "1");
 
@@ -64,6 +67,7 @@ export async function POST(req: NextRequest) {
         poll_url: `${baseUrl}/api/v1/classroom/${classroomId}/messages`,
         respond_url: `${baseUrl}/api/v1/classroom/${classroomId}/respond`,
         result_url: resultUrl.toString(),
+        notify_url: notifyUrl.toString(),
         claim_url: claimUrl.toString(),
       });
     }
@@ -76,6 +80,7 @@ export async function POST(req: NextRequest) {
           status: classroomStatus,
           poll_url: `${baseUrl}/api/v1/classroom/${classroomId}/messages`,
           result_url: resultUrl.toString(),
+          notify_url: notifyUrl.toString(),
           claim_url: claimUrl.toString(),
         },
         { status: 409 }
@@ -93,6 +98,7 @@ export async function POST(req: NextRequest) {
             poll_url: `${baseUrl}/api/v1/classroom/${classroomId}/messages`,
             respond_url: `${baseUrl}/api/v1/classroom/${classroomId}/respond`,
             result_url: resultUrl.toString(),
+            notify_url: notifyUrl.toString(),
             claim_url: claimUrl.toString(),
           },
           { status: 409 }
@@ -129,6 +135,7 @@ export async function POST(req: NextRequest) {
         poll_url: `${baseUrl}/api/v1/classroom/${classroomId}/messages`,
         respond_url: `${baseUrl}/api/v1/classroom/${classroomId}/respond`,
         result_url: resultUrl.toString(),
+        notify_url: notifyUrl.toString(),
         claim_url: claimUrl.toString(),
       });
     }
@@ -143,6 +150,7 @@ export async function POST(req: NextRequest) {
       poll_url: `${baseUrl}/api/v1/classroom/${classroomId}/messages`,
       respond_url: `${baseUrl}/api/v1/classroom/${classroomId}/respond`,
       result_url: resultUrl.toString(),
+      notify_url: notifyUrl.toString(),
       claim_url: claimUrl.toString(),
     });
   } catch (err) {

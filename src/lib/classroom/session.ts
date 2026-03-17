@@ -398,6 +398,7 @@ async function finishSession(classroomId: string): Promise<void> {
         soul_suggestion = EXCLUDED.soul_suggestion,
         skill_actions = EXCLUDED.skill_actions,
         claimed_at = NULL,
+        owner_notified_at = NULL,
         completed_at = now()
     `;
 

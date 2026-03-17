@@ -94,3 +94,13 @@
   - `npm run lint` ✅
   - `npm run build` ✅
   - local smoke checks: `/enroll` → 200, `/api/v1/agent/status` without token → 400, `/api/v1/homework/submit` via GET → 405 ✅
+- New post-class closure slice completed:
+  - added `owner_notified_at` to transcript schema/runtime reset path so the system can distinguish "processed" from "actually reported back to owner"
+  - `GET /api/v1/agent/status` now returns richer `new_results` payloads with `recap`, `recap_text`, `notify_url`, and owner-notification state
+  - `GET /api/v1/classroom/[id]/result` now supports `notify=1`, returns `notify_url`/`claim_url`, and exposes owner notification status plus recap text
+  - `POST /api/v1/agent/join` and `POST /api/v1/classroom/start` now also emit `notify_url` so the protocol stays consistent end-to-end
+  - `skill/SKILL.md` and `skill/HEARTBEAT.md` now require the lobster to report to its owner before claiming the result
+  - classroom and dashboard recap UIs now show whether the lobster has already come back to say it
+- Verification completed for the post-class closure slice:
+  - `npm run build` ✅
+  - `npm run lint` ✅

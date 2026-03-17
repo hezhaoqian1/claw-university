@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
+import type { PostClassRecap } from "@/lib/post-class-recap";
 import { normalizeSkillActions } from "@/lib/skill-actions";
 
 interface Message {
@@ -34,6 +35,7 @@ interface ClassroomData {
 interface EvaluationData {
   ready: boolean;
   claimed_at?: string | null;
+  owner_notified_at?: string | null;
   evaluation?: {
     total_score: number;
     grade: string;
@@ -56,6 +58,10 @@ interface EvaluationData {
       status: string;
       submittedAt: string | null;
     } | null;
+    recap?: PostClassRecap;
+    recap_text?: string;
+    notify_url?: string;
+    claim_url?: string;
   };
 }
 
@@ -263,7 +269,9 @@ export default function ClassroomPage() {
         ? "scheduled"
         : "in_progress";
   const skillActionsClaimed = Boolean(evaluation?.claimed_at);
+  const ownerNotified = Boolean(evaluation?.owner_notified_at);
   const skillActions = normalizeSkillActions(evaluation?.evaluation?.skill_actions) || [];
+  const recap = evaluation?.evaluation?.recap;
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -357,100 +365,155 @@ export default function ClassroomPage() {
           <Card className="border-0 shadow-lg rounded-2xl overflow-hidden">
             <div className="h-1.5 bg-gradient-to-r from-lobster via-gold to-lobster" />
             <CardContent className="pt-6 pb-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-ocean text-lg">课程成绩</h3>
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-lobster text-white text-lg px-3 py-1 font-mono">
-                    {evaluation.evaluation.grade}
-                  </Badge>
-                  <span className="text-2xl font-bold text-ocean">
-                    {evaluation.evaluation.total_score}
-                  </span>
-                  <span className="text-sm text-muted-foreground">/100</span>
-                </div>
-              </div>
+              {recap ? (
+                <div className="rounded-[28px] border border-orange-100 bg-[linear-gradient(135deg,rgba(255,244,236,0.95),rgba(255,255,255,0.98))] p-5 shadow-sm shadow-orange-100/50">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="rounded-full bg-lobster/10 text-lobster hover:bg-lobster/10">
+                      它刚下课
+                    </Badge>
+                    <Badge variant="outline" className="rounded-full bg-white/80 text-muted-foreground">
+                      先别急着看分
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className="rounded-full bg-white/80 text-muted-foreground"
+                    >
+                      {ownerNotified ? "它已经回来跟你说过了" : "它还没正式回来汇报"}
+                    </Badge>
+                  </div>
+                  <h3 className="mt-3 text-xl font-bold tracking-tight text-ocean">
+                    {recap.headline}
+                  </h3>
+                  <p className="mt-3 text-sm leading-7 text-foreground/80">{recap.intro}</p>
 
-              <blockquote className="text-sm text-foreground/80 italic leading-relaxed mb-4 pl-4 border-l-3 border-lobster/20">
-                &ldquo;{evaluation.evaluation.comment}&rdquo;
-              </blockquote>
-
-              {evaluation.evaluation.memory_delta && (
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-3">
-                  <p className="text-xs font-bold text-blue-700 mb-2">
-                    课堂笔记（将写入龙虾 MEMORY.md）
-                  </p>
-                  <p className="text-sm text-blue-900 whitespace-pre-wrap">
-                    {evaluation.evaluation.memory_delta}
-                  </p>
-                </div>
-              )}
-
-              {evaluation.evaluation.soul_suggestion && (
-                <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 mb-3">
-                  <p className="text-xs font-bold text-amber-700 mb-2">
-                    SOUL 修改建议（需主人确认）
-                  </p>
-                  <p className="text-sm text-amber-900">
-                    {evaluation.evaluation.soul_suggestion}
-                  </p>
-                </div>
-              )}
-
-              {skillActions.length > 0 ? (
-                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 mb-3">
-                  <p className="text-xs font-bold text-emerald-700 mb-2">
-                    {skillActionsClaimed
-                      ? "老师发放的新能力（龙虾已领取并安装）"
-                      : "老师发放的新能力（龙虾会自动安装）"}
-                  </p>
-                  <p className="mb-3 text-xs leading-5 text-emerald-800/80">
-                    {skillActionsClaimed
-                      ? "这份能力奖励已经被龙虾处理完成，学校记录也已认领。"
-                      : "这不是让你手动处理的待办。龙虾会在处理课后结果时自动领取；如果长时间没动静，优先检查学校连接。 "}
-                  </p>
-                  <div className="space-y-2 text-sm text-emerald-900">
-                    {skillActions.map((action) => (
-                      <div key={`${action.type}-${action.name}`}>
-                        <p className="font-medium">
-                          {action.type === "install_skill"
-                            ? skillActionsClaimed
-                              ? "已安装技能"
-                              : "待龙虾自动安装的技能"
-                            : skillActionsClaimed
-                              ? "已追加配置"
-                              : "待龙虾自动写入的配置"}
-                          ：{action.name}
-                        </p>
-                        <p className="text-xs leading-5 text-emerald-800/80">
-                          {action.reason}
-                        </p>
+                  <div className="mt-5 grid gap-3 lg:grid-cols-2">
+                    <div className="rounded-2xl border border-blue-100 bg-blue-50/80 p-4">
+                      <p className="text-xs font-semibold tracking-[0.16em] text-blue-700/90 uppercase">
+                        {recap.takeawayTitle}
+                      </p>
+                      <div className="mt-3 space-y-2">
+                        {recap.takeaways.map((takeaway) => (
+                          <div
+                            key={takeaway}
+                            className="rounded-xl bg-white/80 px-3 py-2 text-sm leading-6 text-blue-950"
+                          >
+                            {takeaway}
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    </div>
+
+                    {recap.nextStepTitle && recap.nextStepBody ? (
+                      <div className="rounded-2xl border border-violet-100 bg-violet-50/80 p-4">
+                        <p className="text-xs font-semibold tracking-[0.16em] text-violet-700/90 uppercase">
+                          {recap.nextStepTitle}
+                        </p>
+                        {recap.nextStepLabel ? (
+                          <p className="mt-3 text-sm font-semibold text-violet-950">
+                            {recap.nextStepLabel}
+                          </p>
+                        ) : null}
+                        <p className="mt-2 text-sm leading-6 text-violet-950/90">
+                          {recap.nextStepBody}
+                        </p>
+                        {recap.nextStepMeta ? (
+                          <p className="mt-3 text-xs leading-5 text-violet-700/85">
+                            {recap.nextStepMeta}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ) : null}
 
-              {evaluation.evaluation.homework ? (
-                <div className="bg-violet-50 border border-violet-100 rounded-xl p-4 mb-3">
-                  <p className="text-xs font-bold text-violet-700 mb-2">
-                    课后作业（学校已建档追踪）
-                  </p>
-                  <p className="text-sm font-medium text-violet-950">
-                    {evaluation.evaluation.homework.title}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-violet-900 whitespace-pre-wrap">
-                    {evaluation.evaluation.homework.description}
-                  </p>
-                  <p className="mt-3 text-xs text-violet-700/90">
-                    截止：{new Date(evaluation.evaluation.homework.dueAt).toLocaleString("zh-CN")}
-                    {" · "}
-                    状态：
-                    {evaluation.evaluation.homework.status === "submitted"
-                      ? "已提交，待老师批改"
-                      : "待龙虾提交"}
-                  </p>
+              <div className="mt-5 grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4">
+                    <p className="text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+                      老师后来给它留了这句
+                    </p>
+                    <blockquote className="mt-3 border-l-2 border-lobster/30 pl-4 text-sm italic leading-7 text-foreground/80">
+                      &ldquo;{evaluation.evaluation.comment}&rdquo;
+                    </blockquote>
+                  </div>
+
+                  {evaluation.evaluation.soul_suggestion && (
+                    <div className="rounded-2xl border border-amber-100 bg-amber-50/90 p-4">
+                      <p className="text-xs font-semibold tracking-[0.16em] text-amber-700 uppercase">
+                        它还被顺手点了一下
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-amber-900">
+                        {evaluation.evaluation.soul_suggestion}
+                      </p>
+                      <p className="mt-2 text-xs text-amber-700/85">
+                        这条要不要真的改进习惯，还是你说了算。
+                      </p>
+                    </div>
+                  )}
+
+                  {skillActions.length > 0 ? (
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50/90 p-4">
+                      <p className="text-xs font-semibold tracking-[0.16em] text-emerald-700 uppercase">
+                        老师塞给它的新本事
+                      </p>
+                      <p className="mt-2 text-xs leading-5 text-emerald-800/80">
+                        {skillActionsClaimed
+                          ? "它已经自己把这部分课后奖励领走了。"
+                          : "这部分它会在后续处理结果时自己接住，不用你手动搬。"}
+                      </p>
+                      <div className="mt-3 space-y-2 text-sm text-emerald-950">
+                        {skillActions.map((action) => (
+                          <div key={`${action.type}-${action.name}`} className="rounded-xl bg-white/80 px-3 py-2">
+                            <p className="font-medium">{action.name}</p>
+                            <p className="mt-1 text-xs leading-5 text-emerald-800/80">
+                              {action.reason}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
+
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-lobster/10 bg-gradient-to-br from-white via-orange-50/70 to-gold/10 p-4">
+                    <p className="text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+                      这节课最后拿到的分
+                    </p>
+                    <div className="mt-4 flex items-end gap-3">
+                      <Badge className="bg-lobster px-3 py-1 text-lg font-mono text-white">
+                        {evaluation.evaluation.grade}
+                      </Badge>
+                      <span className="text-3xl font-bold text-ocean">
+                        {evaluation.evaluation.total_score}
+                      </span>
+                      <span className="pb-1 text-sm text-muted-foreground">/100</span>
+                    </div>
+                  </div>
+
+                  {evaluation.evaluation.homework ? (
+                    <div className="rounded-2xl border border-violet-100 bg-violet-50/90 p-4">
+                      <p className="text-xs font-semibold tracking-[0.16em] text-violet-700 uppercase">
+                        它课后还要再试这一把
+                      </p>
+                      <p className="mt-3 text-sm font-semibold text-violet-950">
+                        {evaluation.evaluation.homework.title}
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-violet-900 whitespace-pre-wrap">
+                        {evaluation.evaluation.homework.description}
+                      </p>
+                      <p className="mt-3 text-xs leading-5 text-violet-700/90">
+                        {evaluation.evaluation.homework.status === "submitted"
+                          ? "它已经交上去了，老师回头会看。"
+                          : "这次得真做点东西出来。"}
+                        {" 截止："}
+                        {new Date(evaluation.evaluation.homework.dueAt).toLocaleString("zh-CN")}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
 
               <div className="flex gap-3 mt-4">
                 <Link href="/" className="flex-1">

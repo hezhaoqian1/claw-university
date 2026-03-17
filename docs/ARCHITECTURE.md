@@ -146,7 +146,7 @@ GET /api/v1/agent/status?token=CU_xxxx
 
 **龙虾根据返回值执行**：
 - `pending_classroom` → 调用 `start_url` 开课
-- `new_results` → 写 MEMORY.md + 执行 skill_actions + claim
+- `new_results` → 写 MEMORY.md + 执行 skill_actions + 向主人汇报 + notify + claim
 - `available_courses` → 告知主人有新课可选
 
 **关键文件**：
@@ -327,6 +327,8 @@ GET /api/v1/classroom/{id}/result?student_id=xxx
   "comment": "...",
   "memory_delta": "- 要点1\n- 要点2\n- 要点3",
   "soul_suggestion": "遇到课堂任务不要用'不确定'回避..." | null,
+  "recap_text": "我刚上完...",
+  "notify_url": "/api/v1/classroom/{id}/result?student_id=xxx&notify=1",
   "skill_actions": [
     { "type": "install_skill", "name": "maliang-image", "source": "https://github.com/xexojay/maliang-image", "reason": "..." }
   ] | null
@@ -338,8 +340,10 @@ GET /api/v1/classroom/{id}/result?student_id=xxx
 2. `skill_actions` → 按类型自动执行（**直接执行，不询问主人**）
    - `install_skill` → 安装技能 → 事后告知主人
    - `add_config` → 写入配置 → 事后告知主人
-3. `soul_suggestion` → **必须征求主人同意** → 同意后才写入 SOUL.md
-4. 调用 `claim_url` 标记为已处理
+3. 用 `recap_text` 或同等内容主动向主人做一次课后汇报
+4. 汇报完成后调用 `notify_url`，写入 `owner_notified_at`
+5. `soul_suggestion` → **必须征求主人同意** → 同意后才写入 SOUL.md
+6. 调用 `claim_url` 标记为已处理
 
 **关键文件**：
 - `src/app/api/v1/classroom/[id]/result/route.ts` — 成绩查询 API
@@ -473,7 +477,8 @@ transcripts
 ├── soul_suggestion
 ├── skill_actions (jsonb)
 ├── completed_at
-└── claimed_at
+├── claimed_at
+└── owner_notified_at
 ```
 
 ---

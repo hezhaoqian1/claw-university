@@ -3,6 +3,7 @@ import sql from "@/lib/db";
 import { getBaseUrl } from "@/lib/app-url";
 import { ensureClassroomDataModel } from "@/lib/classroom/ownership";
 import { isLiveCourseName, isRetiredLiveCourseName } from "@/lib/courses/registry";
+import { buildOwnerRecapMessage, buildPostClassRecap } from "@/lib/post-class-recap";
 import { SKILL_VERSION } from "@/lib/skill-files";
 import { listPendingHomeworkForStudent } from "@/lib/homework";
 import { normalizeSkillActions } from "@/lib/skill-actions";
@@ -28,6 +29,17 @@ export async function GET(req: NextRequest) {
     const student = students[0];
     const baseUrl = getBaseUrl(req);
     const pendingHomework = await listPendingHomeworkForStudent(student.id as string);
+    const homeworkRows = await sql`
+      SELECT
+        classroom_id,
+        title,
+        description,
+        due_at,
+        status,
+        submitted_at
+      FROM homework_assignments
+      WHERE student_id = ${student.id}
+    `;
     const skillUpdateUrl = new URL("/api/v1/skill", baseUrl);
     skillUpdateUrl.searchParams.set("token", token);
     const heartbeatUpdateUrl = new URL("/api/v1/skill", baseUrl);
@@ -87,6 +99,7 @@ export async function GET(req: NextRequest) {
         t.memory_delta,
         t.soul_suggestion,
         t.skill_actions,
+        t.owner_notified_at,
         co.name as course_name
       FROM transcripts t
       JOIN courses co ON co.id = t.course_id
@@ -94,6 +107,18 @@ export async function GET(req: NextRequest) {
         AND t.claimed_at IS NULL
       ORDER BY t.completed_at DESC
     `;
+    const homeworkByClassroomId = new Map(
+      homeworkRows.map((row) => [
+        row.classroom_id as string,
+        {
+          title: row.title as string,
+          description: row.description as string,
+          dueAt: row.due_at as string,
+          status: row.status as string,
+          submittedAt: row.submitted_at as string | null,
+        },
+      ])
+    );
 
     const availableCourses = await sql`
       SELECT co.id, co.name, co.description
@@ -130,31 +155,60 @@ export async function GET(req: NextRequest) {
         status: assignment.status,
         submit_url: `${baseUrl}/api/v1/homework/submit`,
       })),
-      new_results: newResults.map((r) => ({
-        classroom_id: r.classroom_id,
-        course_name: r.course_name,
-        score: r.final_score,
-        grade: r.grade,
-        comment: r.teacher_comment,
-        memory_delta: r.memory_delta,
-        soul_suggestion: r.soul_suggestion,
-        skill_actions: normalizeSkillActions(r.skill_actions),
-        result_url: r.classroom_id
+      new_results: newResults.map((r) => {
+        const skillActions = normalizeSkillActions(r.skill_actions);
+        const homework = r.classroom_id
+          ? homeworkByClassroomId.get(r.classroom_id as string) || null
+          : null;
+        const recap = buildPostClassRecap({
+          grade: r.grade as string,
+          teacherComment: r.teacher_comment as string | null,
+          memoryDelta: r.memory_delta as string | null,
+          soulSuggestion: r.soul_suggestion as string | null,
+          skillActions,
+          homework,
+        });
+        const resultUrl = r.classroom_id
           ? (() => {
               const url = new URL(`/api/v1/classroom/${r.classroom_id}/result`, baseUrl);
-              url.searchParams.set("student_id", student.id);
+              url.searchParams.set("student_id", student.id as string);
               return url.toString();
             })()
-          : null,
-        claim_url: r.classroom_id
-          ? (() => {
-              const url = new URL(`/api/v1/classroom/${r.classroom_id}/result`, baseUrl);
-              url.searchParams.set("student_id", student.id);
-              url.searchParams.set("claim", "1");
-              return url.toString();
-            })()
-          : null,
-      })),
+          : null;
+        const claimUrl = resultUrl ? (() => {
+          const url = new URL(resultUrl);
+          url.searchParams.set("claim", "1");
+          return url.toString();
+        })() : null;
+        const notifyUrl = resultUrl ? (() => {
+          const url = new URL(resultUrl);
+          url.searchParams.set("notify", "1");
+          return url.toString();
+        })() : null;
+
+        return {
+          classroom_id: r.classroom_id,
+          course_name: r.course_name,
+          score: r.final_score,
+          grade: r.grade,
+          comment: r.teacher_comment,
+          memory_delta: r.memory_delta,
+          soul_suggestion: r.soul_suggestion,
+          skill_actions: skillActions,
+          owner_notified_at: r.owner_notified_at,
+          owner_update_required: !r.owner_notified_at,
+          recap,
+          recap_text: buildOwnerRecapMessage({
+            courseName: r.course_name as string,
+            grade: r.grade as string,
+            score: Number(r.final_score),
+            recap,
+          }),
+          result_url: resultUrl,
+          notify_url: notifyUrl,
+          claim_url: claimUrl,
+        };
+      }),
       available_courses: availableCourses
         .filter((c) => !isRetiredLiveCourseName(c.name as string))
         .map((c) => ({

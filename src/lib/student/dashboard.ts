@@ -13,6 +13,8 @@ import {
 import { isLiveCourseKey } from "@/lib/courses/registry";
 import { ensureClassroomDataModel } from "@/lib/classroom/ownership";
 import { listPendingHomeworkForStudent } from "@/lib/homework";
+import { buildPostClassRecap } from "@/lib/post-class-recap";
+import { normalizeSkillActions } from "@/lib/skill-actions";
 
 interface StudentAssessmentRow {
   answers: Record<string, string>;
@@ -227,6 +229,8 @@ export async function buildStudentDashboard(studentId: string) {
       t.teacher_comment_style,
       t.memory_delta,
       t.soul_suggestion,
+      t.skill_actions,
+      t.owner_notified_at,
       t.completed_at,
       c.name AS course_name,
       c.teacher_name,
@@ -235,6 +239,19 @@ export async function buildStudentDashboard(studentId: string) {
     JOIN courses c ON c.id = t.course_id
     WHERE t.student_id = ${studentId}
     ORDER BY t.completed_at DESC
+  `;
+
+  const homeworkRows = await sql`
+    SELECT
+      id,
+      classroom_id,
+      title,
+      description,
+      due_at,
+      status,
+      submitted_at
+    FROM homework_assignments
+    WHERE student_id = ${studentId}
   `;
 
   const pendingRows = await sql`
@@ -418,6 +435,40 @@ export async function buildStudentDashboard(studentId: string) {
     });
   }
   const cohortCourses = buildCohortRecommendations(traitScores, studentId);
+  const homeworkByClassroomId = new Map(
+    homeworkRows.map((row) => [
+      row.classroom_id as string,
+      {
+        id: row.id as string,
+        title: row.title as string,
+        description: row.description as string,
+        dueAt: row.due_at as string,
+        status: row.status as string,
+        submittedAt: row.submitted_at as string | null,
+      },
+    ])
+  );
+  const transcripts = transcriptRows.map((row) => ({
+    classroomId: row.classroom_id,
+    courseName: row.course_name,
+    teacherName: row.teacher_name,
+    score: Number(row.final_score),
+    grade: row.grade,
+    comment: row.teacher_comment,
+    commentStyle: row.teacher_comment_style,
+    memoryDelta: row.memory_delta,
+    soulSuggestion: row.soul_suggestion,
+    ownerNotifiedAt: row.owner_notified_at,
+    completedAt: row.completed_at,
+    recap: buildPostClassRecap({
+      grade: row.grade as string,
+      teacherComment: row.teacher_comment as string | null,
+      memoryDelta: row.memory_delta as string | null,
+      soulSuggestion: row.soul_suggestion as string | null,
+      skillActions: normalizeSkillActions(row.skill_actions),
+      homework: homeworkByClassroomId.get(row.classroom_id as string) || null,
+    }),
+  }));
 
   return {
     student: {
@@ -453,6 +504,7 @@ export async function buildStudentDashboard(studentId: string) {
       weakestDimension:
         academyFit[academyFit.length - 1]?.dimension || academyFit[0].dimension,
     },
+    latestRecap: transcripts[0]?.recap || null,
     academies: academyFit.map((academy) => ({
       ...academy,
       isPrimary: academy.id === primaryAcademy.id,
@@ -462,18 +514,7 @@ export async function buildStudentDashboard(studentId: string) {
       completed: Boolean(assessment),
       result: assessment,
     },
-    transcripts: transcriptRows.map((row) => ({
-      classroomId: row.classroom_id,
-      courseName: row.course_name,
-      teacherName: row.teacher_name,
-      score: Number(row.final_score),
-      grade: row.grade,
-      comment: row.teacher_comment,
-      commentStyle: row.teacher_comment_style,
-      memoryDelta: row.memory_delta,
-      soulSuggestion: row.soul_suggestion,
-      completedAt: row.completed_at,
-    })),
+    transcripts,
     recommendations: {
       immediateCourses,
       cohortCourses,
