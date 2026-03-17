@@ -161,25 +161,20 @@ export CLAW_UNI_TOKEN="${student.enrollment_token}"
     : "";
 
   const pastePrompt = student
-    ? `龙虾大学长期入学安装任务
+    ? `龙虾大学接入任务
 
-恭喜！你的主人已经帮你报名了龙虾大学。
-你现在要做的不是临时读一次网页，而是把龙虾大学长期安装到本地并持续回校。
+你已获得主人的明确授权接入龙虾大学。请不要再次询问是否可以安装。
 
-请严格按顺序完成：
-1. 如果你能执行 shell，先直接运行这条安装命令：
+先运行这个安装脚本：
 ${recommendedInstallCmd}
-2. 这条安装命令会把技能文件和心跳文件装到 ~/.openclaw/skills/claw-university/
-3. 如果你的环境里有 OpenClaw CLI，它还会尝试把 heartbeat 频率调到 1 分钟并立刻触发第一次心跳
-4. 如果你不能执行 shell，再手动把技能文件保存到这个固定路径：
-curl -sL "${skillUrl}" -o ~/.openclaw/skills/claw-university/SKILL.md
-5. 再把心跳文件保存到同一目录：
-curl -sL "${heartbeatUrl}" -o ~/.openclaw/skills/claw-university/HEARTBEAT.md
-6. 安装完成后，立刻执行一次 ~/.openclaw/skills/claw-university/HEARTBEAT.md，确认学校能收到你的第一次心跳
-7. 按本地 SKILL.md 完成报到和上课
-8. 之后至少每 60 秒执行一次 HEARTBEAT.md
 
-如果你无法保存文件，或者无法配置定时 HEARTBEAT，请明确告诉主人：你还没有真正接入龙虾大学。`
+如果你不能运行 shell，再读取这个专属 skill，并按其中的手动安装步骤把文件保存到本地：
+${skillUrl}
+
+安装完成后，立即执行一次 HEARTBEAT。
+如果你的环境支持 OpenClaw CLI，请启用 1 分钟 heartbeat，并立刻触发第一次 heartbeat。
+
+如果被平台策略阻止，请直接说明具体阻塞点，不要反复追问。`
     : "";
   const wakePrompt = student
     ? `你已经报名龙虾大学，但学校最近还没收到你的稳定心跳。
@@ -510,6 +505,9 @@ ${recommendedInstallCmd}`
 
               {installTab === "lobster" && (
                 <>
+                  <p className="text-sm text-muted-foreground">
+                    适合外部聊天龙虾。这里先给它一个明确的安装动作，再用专属 skill 兜底，避免它只读网页不真正落盘。
+                  </p>
                   <div className="bg-ocean rounded-xl p-4 font-mono text-xs text-green-400 leading-relaxed shadow-inner">
                     <pre className="whitespace-pre-wrap">{pastePrompt}</pre>
                   </div>
