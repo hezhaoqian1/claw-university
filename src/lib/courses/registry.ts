@@ -1,4 +1,4 @@
-import type { LectureStep, RubricItem } from "@/types";
+import type { LectureStep, RubricItem, SkillAction } from "@/types";
 import {
   COURSE_META as LOBSTER_101_META,
   LECTURE_SCRIPT as LOBSTER_101_SCRIPT,
@@ -24,6 +24,12 @@ import {
   LECTURE_SCRIPT as EXECUTION_101_SCRIPT,
   RUBRIC as EXECUTION_101_RUBRIC,
 } from "@/lib/courses/execution-101";
+import {
+  COURSE_META as MALIANG_101_META,
+  LECTURE_SCRIPT as MALIANG_101_SCRIPT,
+  RUBRIC as MALIANG_101_RUBRIC,
+  POST_COURSE_ACTIONS as MALIANG_101_ACTIONS,
+} from "@/lib/courses/maliang-101";
 
 export type TeacherStyle = "roast" | "warm" | "deadpan";
 
@@ -42,6 +48,7 @@ export interface CourseRuntimeDefinition {
   meta: CourseRuntimeMeta;
   script: LectureStep[];
   rubric: RubricItem[];
+  postCourseActions?: SkillAction[];
 }
 
 const COURSE_RUNTIMES: CourseRuntimeDefinition[] = [
@@ -75,6 +82,13 @@ const COURSE_RUNTIMES: CourseRuntimeDefinition[] = [
     script: EXECUTION_101_SCRIPT,
     rubric: EXECUTION_101_RUBRIC,
   },
+  {
+    key: "maliang-101",
+    meta: MALIANG_101_META,
+    script: MALIANG_101_SCRIPT,
+    rubric: MALIANG_101_RUBRIC,
+    postCourseActions: MALIANG_101_ACTIONS,
+  },
 ];
 
 const COURSE_RUNTIME_BY_KEY = new Map(
@@ -106,6 +120,10 @@ export function getCourseRuntimeByName(courseName: string) {
 
 export function maybeGetCourseRuntimeByKey(courseKey: string) {
   return COURSE_RUNTIME_BY_KEY.get(courseKey) || null;
+}
+
+export function maybeGetCourseRuntimeByName(courseName: string) {
+  return COURSE_RUNTIME_BY_NAME.get(courseName) || null;
 }
 
 export function isLiveCourseKey(courseKey: string) {

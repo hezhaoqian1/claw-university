@@ -1,0 +1,46 @@
+# Findings
+
+## 2026-03-16
+- Repository work is in `/Users/hezhaoqian/Desktop/CLAW_UNIversity/claw-university`.
+- The repo is already dirty from prior academy work; unrelated changes must be preserved.
+- Homepage currently does not detect remembered users.
+- Enrollment currently uses a single `last-enrollment` localStorage record.
+- No `/my` route exists yet.
+- Existing build baseline before this slice was passing; lint had one existing warning in `src/app/page.tsx`.
+- `src/app/page.tsx` currently renders only `/demo` and `/enroll` CTAs in the hero area.
+- `src/app/enroll/page.tsx` owns local storage parsing/writing directly instead of using shared client storage.
+- `src/components/student/student-dashboard.tsx` still routes fallback navigation back to `/enroll`, which reinforces the wrong mental model for returning owners.
+- Student dashboard has two owner-navigation points to fix:
+  - error state button around line 276
+  - footer back-link around line 715
+- No `/my` route exists under `src/app`, so returning users currently have no first-class owner home.
+- The repo already has `src/components/student` and `src/lib/student`; shared remembered-lobster storage can live cleanly in `src/lib` without coupling page state together.
+- The only existing date-format helpers are local to `student-dashboard.tsx`, so `/my` will likely need its own light formatting helpers unless a shared utility is introduced.
+- The homepage returning-user CTA must not read `localStorage` during the first render, otherwise the server-rendered guest CTA and the hydrated returning-user CTA can mismatch.
+- If `/my` should feel like a true owner hub, opening a lobster from that page should refresh its `lastSeenAt` timestamp before navigation.
+- Demo and share-admission pages can keep `/enroll` as their CTA because they are acquisition surfaces, but classroom completion should route owners back to `/my` instead of asking them to re-enroll.
+- React 19 linting prefers wiring browser persistence like local storage through an external-store pattern; `useSyncExternalStore` fits this returning-user flow better than `useEffect + setState`.
+- Production verification passed for the key owner-entry routes: `/`, `/my`, `/enroll`, and `/student/test-id`.
+- The academy catalog already defines 4 immediate courses (`tool-101`, `honesty-101`, `empathy-101`, `execution-101`), but `buildStudentDashboard` still disables them all as “课程策划中”.
+- The classroom runtime (`src/lib/classroom/session.ts`) and the start API (`src/app/api/v1/classroom/start/route.ts`) are still hardcoded to `lobster-101`.
+- A multi-course implementation should keep blueprint ids and runtime ids aligned, otherwise recommendation cards and actual classes will drift apart.
+- The cleanest user-facing launch flow is a dedicated `/learn/[studentId]/[courseKey]` page that starts or resumes class and then redirects, instead of linking recommendation cards straight to a mutation API.
+- Teacher voice cannot stay hardcoded to `蓝钳教授`; once warm/deadpan teachers go live, the LLM evaluation prompts must accept teacher name and style as inputs.
+- If only the top 3 immediate recommendations are shown, one of the newly opened live courses stays hidden; for “I want to try the courses now” this is the wrong UX, so the dashboard should surface all currently open immediate courses.
+- Once multiple teachers exist, course cards need visible teacher identity and style, otherwise different courses still feel like the same class wearing different titles.
+- The repository did not yet have a versioned `docs/` directory even though the README referenced shared docs in `../docs`; adding a repo-local architecture doc makes the next implementation plan easier to track in git.
+- The next architecture should be built around owner-controlled course enrollment plus heartbeat-based lobster discovery, not around automatic course enrollment or forced wake-up claims.
+
+## 2026-03-17
+- The groundwork slice was already partially implemented when resumed: schema, session prestart, enroll/start split, dashboard mutation flow, and protocol docs had code changes in place but were not fully verified.
+- `@/types` resolves to `src/types.ts`, not `src/types/index.ts`; adding new shared types only in `src/types/index.ts` does not satisfy runtime/build imports.
+- `pending_classroom` in the heartbeat API should only expose classrooms backed by a live runtime, otherwise future cohort or unsupported classrooms can send the lobster into a 500 path.
+- `POST /api/v1/classroom/start` needs an explicit guard for `completed` classrooms; otherwise a stale caller could accidentally recreate a runtime session for an already finished class.
+- The core new owner flow now works conceptually as intended:
+  - owner selects a course
+  - teacher prelude appears immediately
+  - lobster discovers the scheduled class on heartbeat
+  - runtime resumes from the first interactive step
+- The biggest remaining technical limitation is unchanged: classroom runtime state is still in memory, so a server restart during an in-progress class cannot fully resume the lesson.
+- The legacy `/learn/[studentId]/[courseKey]` path should now behave like an owner-side enroll shortcut, not a direct start-class call; otherwise it drifts away from the new enroll/start split semantics.
+- `classroom_messages` needs persisted `delay_ms` plus runtime migration on the read path; otherwise prestart messages cannot be replayed progressively and old databases will 500 when the API starts selecting the new column.

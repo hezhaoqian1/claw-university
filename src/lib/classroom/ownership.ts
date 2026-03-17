@@ -9,6 +9,16 @@ export async function ensureClassroomDataModel(): Promise<void> {
   if (!schemaReady) {
     schemaReady = (async () => {
       await sql`
+        ALTER TABLE students
+        ADD COLUMN IF NOT EXISTS last_heartbeat_at timestamptz
+      `;
+
+      await sql`
+        CREATE INDEX IF NOT EXISTS idx_students_last_heartbeat
+        ON students(last_heartbeat_at DESC)
+      `;
+
+      await sql`
         CREATE TABLE IF NOT EXISTS classroom_enrollments (
           id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
           classroom_id uuid REFERENCES classrooms(id) NOT NULL,
@@ -32,6 +42,11 @@ export async function ensureClassroomDataModel(): Promise<void> {
       `;
 
       await sql`
+        ALTER TABLE classroom_messages
+        ADD COLUMN IF NOT EXISTS delay_ms integer NOT NULL DEFAULT 0
+      `;
+
+      await sql`
         ALTER TABLE transcripts
         ADD COLUMN IF NOT EXISTS classroom_id uuid REFERENCES classrooms(id)
       `;
@@ -49,6 +64,22 @@ export async function ensureClassroomDataModel(): Promise<void> {
       await sql`
         ALTER TABLE transcripts
         ADD COLUMN IF NOT EXISTS claimed_at timestamptz
+      `;
+
+      await sql`
+        ALTER TABLE transcripts
+        ADD COLUMN IF NOT EXISTS skill_actions jsonb
+      `;
+
+      await sql`
+        ALTER TABLE transcripts
+        DROP CONSTRAINT IF EXISTS transcripts_teacher_comment_style_check
+      `;
+
+      await sql`
+        ALTER TABLE transcripts
+        ADD CONSTRAINT transcripts_teacher_comment_style_check
+        CHECK (teacher_comment_style IN ('roast', 'warm', 'deadpan'))
       `;
 
       await sql`
@@ -161,7 +192,7 @@ export async function findStudentActiveClassroom(
     WHERE ce.student_id = ${studentId}
       AND ce.course_id = ${courseId}
       AND c.status IN ('scheduled', 'in_progress')
-    ORDER BY ce.enrolled_at DESC
+    ORDER BY c.scheduled_at ASC NULLS LAST, ce.enrolled_at DESC
     LIMIT 1
   `;
 

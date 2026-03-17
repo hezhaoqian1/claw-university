@@ -10,10 +10,7 @@ import {
   scorePlacementAnswers,
   type AcademyDimension,
 } from "@/lib/academy/catalog";
-import {
-  getCourseLaunchPath,
-  isLiveCourseKey,
-} from "@/lib/courses/registry";
+import { isLiveCourseKey } from "@/lib/courses/registry";
 import { ensureClassroomDataModel } from "@/lib/classroom/ownership";
 
 interface StudentAssessmentRow {
@@ -201,6 +198,7 @@ export async function buildStudentDashboard(studentId: string) {
       model_type,
       current_grade,
       total_credits,
+      last_heartbeat_at,
       created_at
     FROM students
     WHERE id = ${studentId}
@@ -243,7 +241,7 @@ export async function buildStudentDashboard(studentId: string) {
     JOIN courses co ON co.id = ce.course_id
     WHERE ce.student_id = ${studentId}
       AND c.status IN ('scheduled', 'in_progress')
-    ORDER BY ce.enrolled_at DESC
+    ORDER BY c.scheduled_at ASC NULLS LAST, ce.enrolled_at DESC
   `;
 
   const rankingRows = await sql`
@@ -334,6 +332,7 @@ export async function buildStudentDashboard(studentId: string) {
         return {
           actionLabel: "课程策划中",
           actionHref: null as string | null,
+          enrollAction: null as { courseKey: string; studentId: string } | null,
           actionDisabled: true,
           isLiveCourse: false,
           durationLabel: course.durationLabel,
@@ -350,16 +349,20 @@ export async function buildStudentDashboard(studentId: string) {
                 ? "再次训练"
                 : "开始上课",
         actionHref:
-          pendingCourse?.status === "in_progress"
-            ? pendingCourse.classroomUrl
-            : getCourseLaunchPath(studentId, course.id),
+          pendingCourse ? pendingCourse.classroomUrl : null,
+        enrollAction: pendingCourse
+          ? null
+          : {
+              courseKey: course.id,
+              studentId,
+            },
         actionDisabled: false,
         isLiveCourse: true,
         durationLabel:
           pendingCourse?.status === "in_progress"
             ? "课堂进行中"
             : pendingCourse?.status === "scheduled"
-              ? "已分班待开课"
+              ? "老师已开场，待龙虾入座"
               : course.durationLabel,
       };
     })(),
@@ -382,7 +385,7 @@ export async function buildStudentDashboard(studentId: string) {
         pendingIntroClassroom?.status === "in_progress"
           ? "课堂进行中"
           : pendingIntroClassroom?.status === "scheduled"
-            ? "已分班待开课"
+            ? "老师已开场，待龙虾入座"
             : "现在可入学",
       dimensions: ["reliability", "communication"] as const,
       outcome: "完成后会拿到第一份成绩单，并解锁更完整的学院推荐。",
@@ -397,9 +400,13 @@ export async function buildStudentDashboard(studentId: string) {
       actionLabel:
         pendingIntroClassroom?.status === "in_progress" ? "继续旁观" : "进入课堂",
       actionHref:
-        pendingIntroClassroom?.status === "in_progress"
-          ? pendingIntroClassroom.classroomUrl
-          : getCourseLaunchPath(studentId, "lobster-101"),
+        pendingIntroClassroom ? pendingIntroClassroom.classroomUrl : null,
+      enrollAction: pendingIntroClassroom
+        ? null
+        : {
+            courseKey: "lobster-101",
+            studentId,
+          },
       actionDisabled: false,
       isLiveCourse: true,
     });
@@ -422,6 +429,7 @@ export async function buildStudentDashboard(studentId: string) {
         gradeState.nextThreshold === gradeState.threshold
           ? 0
           : Math.max(0, gradeState.nextThreshold - totalCredits),
+      lastHeartbeatAt: student.last_heartbeat_at,
     },
     growth: {
       readinessScore,
@@ -462,6 +470,9 @@ export async function buildStudentDashboard(studentId: string) {
     recommendations: {
       immediateCourses,
       cohortCourses,
+    },
+    agentStatus: {
+      lastHeartbeatAt: student.last_heartbeat_at || null,
     },
     academyProfile: {
       primaryAcademy,

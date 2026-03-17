@@ -16,6 +16,7 @@ interface Message {
   role: "teacher" | "student" | "system";
   content: string;
   type: string;
+  delay_ms: number;
   created_at: string;
 }
 
@@ -38,7 +39,18 @@ interface EvaluationData {
     comment_style: string;
     memory_delta: string | null;
     soul_suggestion: string | null;
+    skill_actions?: Array<{
+      type: "install_skill" | "add_config";
+      name: string;
+      source?: string;
+      value?: string;
+      reason: string;
+    }> | null;
   };
+}
+
+interface QueuedPlaybackMessage extends Message {
+  playback_delay_ms: number;
 }
 
 export default function ClassroomPage() {
@@ -55,12 +67,88 @@ export default function ClassroomPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastTimestamp = useRef<string | null>(null);
   const prevMessageCount = useRef(0);
+  const knownMessageIds = useRef(new Set<string>());
+  const playbackQueue = useRef<QueuedPlaybackMessage[]>([]);
+  const playbackTimer = useRef<number | null>(null);
+  const playQueuedMessagesRef = useRef<() => void>(() => {});
 
   const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, []);
+
+  const appendMessagesImmediately = useCallback((incoming: Message[]) => {
+    const freshMessages = incoming.filter((message) => {
+      if (knownMessageIds.current.has(message.id)) {
+        return false;
+      }
+
+      knownMessageIds.current.add(message.id);
+      return true;
+    });
+
+    if (freshMessages.length === 0) {
+      return;
+    }
+
+    setMessages((prev) => [...prev, ...freshMessages]);
+  }, []);
+
+  const queueMessagesForPlayback = useCallback(
+    (incoming: Message[], useStoredDelay: boolean) => {
+      const freshMessages = incoming.filter((message) => {
+        if (knownMessageIds.current.has(message.id)) {
+          return false;
+        }
+
+        knownMessageIds.current.add(message.id);
+        return true;
+      });
+
+      if (freshMessages.length === 0) {
+        return;
+      }
+
+      playbackQueue.current.push(
+        ...freshMessages.map((message) => ({
+          ...message,
+          playback_delay_ms: useStoredDelay ? Math.max(0, message.delay_ms || 0) : 0,
+        }))
+      );
+      playQueuedMessagesRef.current();
+    },
+    []
+  );
+
+  const playQueuedMessages = useCallback(() => {
+    if (playbackTimer.current !== null) {
+      return;
+    }
+
+    const nextMessage = playbackQueue.current[0];
+    if (!nextMessage) {
+      return;
+    }
+
+    playbackTimer.current = window.setTimeout(() => {
+      playbackTimer.current = null;
+
+      const queuedMessage = playbackQueue.current.shift();
+      if (!queuedMessage) {
+        return;
+      }
+
+      const { playback_delay_ms, ...message } = queuedMessage;
+      void playback_delay_ms;
+      setMessages((prev) => [...prev, message]);
+      playQueuedMessagesRef.current();
+    }, nextMessage.playback_delay_ms);
+  }, []);
+
+  useEffect(() => {
+    playQueuedMessagesRef.current = playQueuedMessages;
+  }, [playQueuedMessages]);
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -78,21 +166,26 @@ export default function ClassroomPage() {
       setTeacherName(data.teacher_name || "老师");
 
       if (data.messages.length > 0) {
-        if (lastTimestamp.current) {
-          setMessages((prev) => {
-            const existingIds = new Set(prev.map((m) => m.id));
-            const newMsgs = data.messages.filter((m) => !existingIds.has(m.id));
-            return [...prev, ...newMsgs];
-          });
+        const shouldStageInitialPrelude =
+          !lastTimestamp.current && data.status === "waiting_join_interactive";
+        const shouldQueueBehindPrelude =
+          !shouldStageInitialPrelude &&
+          (playbackQueue.current.length > 0 || playbackTimer.current !== null);
+
+        if (shouldStageInitialPrelude) {
+          queueMessagesForPlayback(data.messages, true);
+        } else if (shouldQueueBehindPrelude) {
+          queueMessagesForPlayback(data.messages, false);
         } else {
-          setMessages(data.messages);
+          appendMessagesImmediately(data.messages);
         }
+
         lastTimestamp.current = data.messages[data.messages.length - 1].created_at;
       }
     } catch (err) {
       console.error("Poll error:", err);
     }
-  }, [classroomId]);
+  }, [appendMessagesImmediately, classroomId, queueMessagesForPlayback]);
 
   const fetchResult = useCallback(async () => {
     try {
@@ -116,6 +209,9 @@ export default function ClassroomPage() {
     return () => {
       window.clearTimeout(kickoff);
       window.clearInterval(interval);
+      if (playbackTimer.current !== null) {
+        window.clearTimeout(playbackTimer.current);
+      }
     };
   }, [fetchMessages]);
 
@@ -193,8 +289,30 @@ export default function ClassroomPage() {
           </div>
         )}
 
+        {status === "waiting_join_interactive" && (
+          <div className="mx-4 mb-4 rounded-2xl border border-amber-100 bg-amber-50/90 px-4 py-3 text-sm text-amber-900">
+            <p className="font-semibold">老师已经开始讲课</p>
+            <p className="mt-1 leading-6">
+              这是课堂开场环节。龙虾下次 HEARTBEAT 报到后，会无感接上互动部分。
+            </p>
+          </div>
+        )}
+
+        {messages.length === 0 && status === "waiting_join_interactive" && (
+          <div className="flex flex-col items-center justify-center h-full px-6 text-center">
+            <div className="text-6xl mb-4 animate-float">🎓</div>
+            <p className="text-lg font-semibold text-ocean mb-2">老师正在开场</p>
+            <p className="text-sm text-muted-foreground max-w-md leading-6">
+              课堂已经排上了，开场白会按节奏逐条出现。龙虾报到后，会直接接上互动环节。
+            </p>
+          </div>
+        )}
+
         {/* Loading initial messages */}
-        {messages.length === 0 && status !== "waiting_join" && status !== "completed" && (
+        {messages.length === 0 &&
+          status !== "waiting_join" &&
+          status !== "waiting_join_interactive" &&
+          status !== "completed" && (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
             <div className="text-6xl mb-4 animate-float">🦞</div>
             <p className="text-base font-medium text-ocean mb-1">课堂加载中…</p>
@@ -266,6 +384,26 @@ export default function ClassroomPage() {
                 </div>
               )}
 
+              {evaluation.evaluation.skill_actions?.length ? (
+                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 mb-3">
+                  <p className="text-xs font-bold text-emerald-700 mb-2">
+                    课后技能操作
+                  </p>
+                  <div className="space-y-2 text-sm text-emerald-900">
+                    {evaluation.evaluation.skill_actions.map((action) => (
+                      <div key={`${action.type}-${action.name}`}>
+                        <p className="font-medium">
+                          {action.type === "install_skill" ? "安装技能" : "追加配置"}：{action.name}
+                        </p>
+                        <p className="text-xs leading-5 text-emerald-800/80">
+                          {action.reason}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               <div className="flex gap-3 mt-4">
                 <Link href="/" className="flex-1">
                   <Button variant="outline" className="w-full rounded-xl">
@@ -294,6 +432,11 @@ export default function ClassroomPage() {
                 <>
                   <span className="inline-block w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />
                   等待龙虾加入 · 自动刷新中
+                </>
+              ) : status === "waiting_join_interactive" ? (
+                <>
+                  <span className="inline-block w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />
+                  老师预热讲课中 · 等待龙虾就位
                 </>
               ) : runtimeActive ? (
                 <>

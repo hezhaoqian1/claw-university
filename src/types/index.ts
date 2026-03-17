@@ -9,6 +9,7 @@ export interface Student {
   soul_snapshot: string | null;
   current_grade: "freshman" | "sophomore" | "junior" | "senior" | "graduate";
   total_credits: number;
+  last_heartbeat_at: string | null;
   created_at: string;
 }
 
@@ -58,6 +59,14 @@ export interface RubricItem {
   max_score: number;
 }
 
+export interface SkillAction {
+  type: "install_skill" | "add_config";
+  name: string;
+  source?: string;
+  value?: string;
+  reason: string;
+}
+
 export interface Classroom {
   id: string;
   course_id: string;
@@ -94,6 +103,7 @@ export interface ClassroomMessage {
     | "feedback"
     | "roll_call"
     | "summary";
+  delay_ms: number;
   created_at: string;
 }
 
@@ -121,6 +131,7 @@ export interface Transcript {
   teacher_comment_style: "roast" | "warm" | "deadpan";
   memory_delta: string | null;
   soul_suggestion: string | null;
+  skill_actions: SkillAction[] | null;
   completed_at: string;
   claimed_at: string | null;
 }

@@ -15,6 +15,14 @@ export interface RubricItem {
   max_score: number;
 }
 
+export interface SkillAction {
+  type: "install_skill" | "add_config";
+  name: string;
+  source?: string;
+  value?: string;
+  reason: string;
+}
+
 export interface DemoMessage {
   role: "teacher" | "student" | "system";
   name: string;

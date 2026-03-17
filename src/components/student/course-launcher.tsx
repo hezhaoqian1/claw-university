@@ -25,7 +25,7 @@ export function CourseLauncher(props: {
 
     async function launchCourse() {
       try {
-        const response = await fetch("/api/v1/classroom/start", {
+        const response = await fetch("/api/v1/courses/enroll", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -116,7 +116,7 @@ export function CourseLauncher(props: {
             </p>
             <div className="mt-8 inline-flex items-center gap-3 rounded-full border border-lobster/15 bg-lobster/5 px-5 py-3 text-sm text-lobster">
               <Loader2 className="size-4 animate-spin" />
-              生成课堂、连接老师、准备讲义…
+              创建课堂、安排老师、准备开场…
             </div>
           </CardContent>
         </Card>

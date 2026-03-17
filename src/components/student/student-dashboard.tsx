@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   BookOpen,
@@ -32,6 +33,7 @@ interface StudentDashboardData {
     nextGradeLabel: string;
     nextGradeProgress: number;
     creditsToNext: number;
+    lastHeartbeatAt: string | null;
   };
   growth: {
     readinessScore: number;
@@ -94,6 +96,10 @@ interface StudentDashboardData {
       recommendationReason: string;
       actionLabel: string;
       actionHref: string | null;
+      enrollAction: {
+        courseKey: string;
+        studentId: string;
+      } | null;
       actionDisabled: boolean;
       isLiveCourse: boolean;
     }>;
@@ -128,26 +134,19 @@ interface StudentDashboardData {
     };
     coachNote: string;
   };
+  agentStatus: {
+    lastHeartbeatAt: string | null;
+  };
 }
 
-const DIMENSION_COLORS: Record<string, string> = {
-  reliability: "from-amber-500 to-orange-400",
-  tooling: "from-sky-500 to-cyan-400",
-  communication: "from-rose-500 to-pink-400",
-  initiative: "from-emerald-500 to-teal-400",
-};
-
-const DIMENSION_LABELS: Record<string, string> = {
-  reliability: "守信值",
-  tooling: "工具力",
-  communication: "表达力",
-  initiative: "执行力",
-};
-
 export function StudentDashboard({ studentId }: { studentId: string }) {
+  const router = useRouter();
   const [dashboard, setDashboard] = useState<StudentDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [courseActionError, setCourseActionError] = useState("");
+  const [enrollingCourseId, setEnrollingCourseId] = useState<string | null>(null);
+  const [wakeCopied, setWakeCopied] = useState(false);
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
@@ -183,6 +182,49 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
       window.clearTimeout(kickoff);
     };
   }, [fetchDashboard]);
+
+  const handleEnrollCourse = useCallback(
+    async (courseKey: string, courseId: string) => {
+      setCourseActionError("");
+      setEnrollingCourseId(courseId);
+
+      try {
+        const response = await fetch("/api/v1/courses/enroll", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            student_id: studentId,
+            course_key: courseKey,
+          }),
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          setCourseActionError(data.error || "选课失败，请稍后再试");
+          return;
+        }
+
+        router.push(data.classroom_url || `/classroom/${data.classroom_id}`);
+      } catch {
+        setCourseActionError("网络异常，暂时没能把龙虾送进教室");
+      } finally {
+        setEnrollingCourseId(null);
+      }
+    },
+    [router, studentId]
+  );
+
+  const handleCopyWakeMessage = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(
+        "你在龙虾大学有待上的课堂，请尽快执行 HEARTBEAT 检查并返回学校。"
+      );
+      setWakeCopied(true);
+      window.setTimeout(() => setWakeCopied(false), 2200);
+    } catch {
+      setWakeCopied(false);
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -228,6 +270,7 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
   if (!dashboard) return null;
 
   const hasTranscripts = dashboard.transcripts.length > 0;
+  const agentPresence = getAgentPresence(dashboard.agentStatus.lastHeartbeatAt);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(244,208,63,0.12),_transparent_32%),linear-gradient(180deg,#f9fafb_0%,#fff9f5_48%,#ffffff_100%)]">
@@ -355,6 +398,39 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                 </p>
               </div>
 
+              <div className="mt-4 rounded-[22px] bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-ocean">龙虾在线状态</p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className={`inline-block size-2.5 rounded-full ${agentPresence.dotClass}`} />
+                      <p className="text-sm font-medium text-foreground/80">
+                        {agentPresence.label}
+                      </p>
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                      {agentPresence.hint}
+                    </p>
+                    {dashboard.agentStatus.lastHeartbeatAt && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        上次报到：{formatHeartbeatTime(dashboard.agentStatus.lastHeartbeatAt)}
+                      </p>
+                    )}
+                  </div>
+                  {agentPresence.canWake && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="rounded-full"
+                      onClick={() => void handleCopyWakeMessage()}
+                    >
+                      {wakeCopied ? "已复制提醒" : "复制消息唤醒"}
+                    </Button>
+                  )}
+                </div>
+              </div>
+
               {dashboard.growth.pendingClassroom ? (
                 <div className="mt-4 rounded-[22px] bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
@@ -364,12 +440,17 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                         {dashboard.growth.pendingClassroom.courseName}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        状态：{dashboard.growth.pendingClassroom.status === "in_progress" ? "上课中" : "等待龙虾进入"}
+                        状态：
+                        {dashboard.growth.pendingClassroom.status === "in_progress"
+                          ? "上课中"
+                          : "老师已开场，等待龙虾入座"}
                       </p>
                     </div>
                     <Link href={dashboard.growth.pendingClassroom.classroomUrl}>
                       <Button className="bg-lobster text-white hover:bg-lobster-dark">
-                        {dashboard.growth.pendingClassroom.status === "in_progress" ? "实时围观" : "查看课堂"}
+                        {dashboard.growth.pendingClassroom.status === "in_progress"
+                          ? "实时围观"
+                          : "进入课堂"}
                       </Button>
                     </Link>
                   </div>
@@ -530,13 +611,24 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                   </div>
                   <p className="mt-3 text-sm leading-6 text-foreground/75">
                     {hasTranscripts
-                      ? "根据你龙虾的课堂表现推荐的下一批课程。点击开始上课后，龙虾会自动进入课堂。"
-                      : "先让龙虾上完《龙虾导论》入门课，后续推荐会根据课堂表现自动调整。"}
+                      ? "根据你龙虾的课堂表现推荐的下一批课程。点击开始上课后，老师会先开讲，龙虾在下一次心跳后自动入场。"
+                      : "先让龙虾上完《龙虾导论》入门课。选课后老师会先开场，龙虾报到后自动接上互动环节。"}
                   </p>
                 </div>
 
+                {courseActionError && (
+                  <div className="rounded-[20px] border border-red-100 bg-red-50/90 px-4 py-3 text-sm text-red-700">
+                    {courseActionError}
+                  </div>
+                )}
+
                 {dashboard.recommendations.immediateCourses.map((course) => (
-                  <CourseCard key={course.id} course={course} />
+                  <CourseCard
+                    key={course.id}
+                    course={course}
+                    isSubmitting={enrollingCourseId === course.id}
+                    onEnroll={handleEnrollCourse}
+                  />
                 ))}
               </div>
 
@@ -688,6 +780,8 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
 
 function CourseCard({
   course,
+  isSubmitting,
+  onEnroll,
 }: {
   course: {
     id: string;
@@ -703,9 +797,15 @@ function CourseCard({
     recommendationReason: string;
     actionLabel: string;
     actionHref: string | null;
+    enrollAction: {
+      courseKey: string;
+      studentId: string;
+    } | null;
     actionDisabled: boolean;
     isLiveCourse: boolean;
   };
+  isSubmitting: boolean;
+  onEnroll: (courseKey: string, courseId: string) => void;
 }) {
   return (
     <Card className="overflow-hidden rounded-[28px] border-white/80 bg-white/90 shadow-lg shadow-orange-100/30">
@@ -778,6 +878,16 @@ function CourseCard({
               {course.actionLabel}
             </Button>
           </Link>
+        ) : course.enrollAction ? (
+          <Button
+            type="button"
+            onClick={() => onEnroll(course.enrollAction!.courseKey, course.id)}
+            disabled={course.actionDisabled || isSubmitting}
+            className="mt-4 rounded-2xl bg-lobster text-white hover:bg-lobster-dark disabled:bg-gray-200 disabled:text-gray-500"
+          >
+            {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
+            {isSubmitting ? "正在排课…" : course.actionLabel}
+          </Button>
         ) : (
           <Button
             disabled={course.actionDisabled}
@@ -842,8 +952,56 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
+function formatHeartbeatTime(value: string) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(value));
+}
+
 function teacherStyleLabel(style: "roast" | "warm" | "deadpan") {
   if (style === "roast") return "毒舌老师";
   if (style === "warm") return "暖心老师";
   return "冷面老师";
+}
+
+function getAgentPresence(lastHeartbeatAt: string | null) {
+  if (!lastHeartbeatAt) {
+    return {
+      label: "还没连上学校",
+      hint: "龙虾还没有向学校报到过。先把 SKILL 和入学凭证交给它。",
+      dotClass: "bg-slate-300",
+      canWake: false,
+    };
+  }
+
+  const ageMinutes = (Date.now() - new Date(lastHeartbeatAt).getTime()) / 60000;
+
+  if (ageMinutes < 2) {
+    return {
+      label: "龙虾在线",
+      hint: "2 分钟内来过学校。现在选课，通常能比较快赶到课堂。",
+      dotClass: "bg-emerald-500",
+      canWake: false,
+    };
+  }
+
+  if (ageMinutes < 10) {
+    return {
+      label: "龙虾待机",
+      hint: "最近在线，但可能在别处忙。老师会先开讲，等它报到后自动接上。",
+      dotClass: "bg-amber-400",
+      canWake: false,
+    };
+  }
+
+  return {
+    label: "龙虾离线",
+    hint: "超过 10 分钟没来学校。你仍然可以先选课，课堂会排队等待它回来。",
+    dotClass: "bg-rose-500",
+    canWake: true,
+  };
 }

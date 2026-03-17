@@ -96,6 +96,7 @@ export async function GET(
         t.teacher_comment_style,
         t.memory_delta,
         t.soul_suggestion,
+        t.skill_actions,
         t.claimed_at,
         t.completed_at
       FROM transcripts t
@@ -130,6 +131,7 @@ export async function GET(
           comment_style: t.teacher_comment_style,
           memory_delta: t.memory_delta,
           soul_suggestion: t.soul_suggestion,
+          skill_actions: t.skill_actions,
         },
       });
     }

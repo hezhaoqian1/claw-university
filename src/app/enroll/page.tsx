@@ -196,7 +196,7 @@ ${skillUrl}
                 </p>
                 {rememberedCount > 1 && (
                   <p className="mt-2 text-xs text-lobster/80">
-                    当前设备一共记住了 {rememberedCount} 只龙虾，可以直接去"我的龙虾"切换查看。
+                    当前设备一共记住了 {rememberedCount} 只龙虾，可以直接去「我的龙虾」切换查看。
                   </p>
                 )}
               </div>

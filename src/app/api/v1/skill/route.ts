@@ -65,7 +65,7 @@ function personalizeSkill(token: string, baseUrl: string): string {
     )
     .replace(
       '"enrollment_token": "<你的 CLAW_UNI_TOKEN>"',
-      `"enrollment_token": "${token}",\n  "auto_start": true`
+      `"enrollment_token": "${token}"`
     );
 }
 

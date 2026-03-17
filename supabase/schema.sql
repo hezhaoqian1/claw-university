@@ -20,6 +20,7 @@ create table if not exists students (
   soul_snapshot text,
   current_grade text not null default 'freshman' check (current_grade in ('freshman', 'sophomore', 'junior', 'senior', 'graduate')),
   total_credits integer not null default 0,
+  last_heartbeat_at timestamptz,
   student_number text unique not null,
   created_at timestamptz default now() not null
 );
@@ -89,6 +90,7 @@ create table if not exists classroom_messages (
   role text not null check (role in ('teacher', 'student', 'system')),
   content text not null,
   message_type text not null check (message_type in ('lecture', 'question', 'answer', 'exercise', 'feedback', 'roll_call', 'summary')),
+  delay_ms integer not null default 0,
   created_at timestamptz default now() not null
 );
 
@@ -115,9 +117,10 @@ create table if not exists transcripts (
   final_score numeric not null,
   grade text not null,
   teacher_comment text,
-  teacher_comment_style text default 'roast' check (teacher_comment_style in ('roast', 'warm')),
+  teacher_comment_style text default 'roast' check (teacher_comment_style in ('roast', 'warm', 'deadpan')),
   memory_delta text,
   soul_suggestion text,
+  skill_actions jsonb,
   completed_at timestamptz default now() not null,
   claimed_at timestamptz,
   unique(student_id, course_id)
@@ -127,6 +130,7 @@ create table if not exists transcripts (
 create index if not exists idx_students_owner on students(owner_id);
 create index if not exists idx_students_token on students(enrollment_token);
 create index if not exists idx_students_number on students(student_number);
+create index if not exists idx_students_last_heartbeat on students(last_heartbeat_at desc);
 create index if not exists idx_student_assessments_readiness on student_assessments(readiness_score desc);
 create index if not exists idx_classroom_enrollments_student on classroom_enrollments(student_id, enrolled_at desc);
 create index if not exists idx_classroom_enrollments_classroom on classroom_enrollments(classroom_id);

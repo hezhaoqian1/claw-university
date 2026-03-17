@@ -1,0 +1,75 @@
+# Progress
+
+## 2026-03-16
+- Activated file-based planning for the returning-user identity slice.
+- Confirmed scope is the lightweight flow only; email recovery is intentionally excluded for now.
+- Confirmed implementation target areas:
+  - `src/app/page.tsx`
+  - `src/app/enroll/page.tsx`
+  - new `/my` route
+  - student dashboard navigation
+- Inspected the homepage hero CTA, enrollment local-storage flow, and student dashboard navigation to map the returning-user gap.
+- Confirmed the exact dashboard links that need to switch from enrollment-centric navigation to owner-centric navigation.
+- Confirmed the code structure for implementation: shared browser storage in `src/lib`, UI changes in homepage/enroll/dashboard, and a new owner-facing `/my` page.
+- Implemented the first pass of the returning-user flow and fixed two follow-up issues during self-review:
+  - homepage CTA now waits until after hydration to switch into returning-user mode
+  - `/my` action buttons refresh remembered-lobster recency before navigating
+- Updated classroom completion navigation so “continue” points back to the owner hub instead of back to enrollment.
+- Rewired remembered-lobster state to `useSyncExternalStore` so lint passes cleanly and same-tab writes refresh immediately.
+- Verification completed:
+  - `npm run lint` ✅
+  - `npm run build` ✅
+  - `npm run start -- --port 3005` + `curl -I / /my /enroll /student/test-id` ✅
+- Synced docs in `README.md` and `docs/CURRENT_STATE.md` to reflect the new owner return flow and the current limitations.
+- New task started: extend the current single-course experience into a small playable multi-course slice.
+- Inspected catalog, start API, session runtime, and dashboard actions to identify the exact single-course bottlenecks.
+- Added a runtime registry and 4 new live immediate course scripts:
+  - `tool-101`
+  - `honesty-101`
+  - `empathy-101`
+  - `execution-101`
+- Upgraded the classroom runtime and start API to work by `courseKey`, not just by the intro course.
+- Added `/learn/[studentId]/[courseKey]` as the user-facing launch path for starting or resuming an immediate course.
+- Rewired dashboard immediate course cards so live courses now show `开始上课 / 继续上课 / 再次训练` instead of `课程策划中`.
+- Expanded the student dashboard course tab to surface all currently open immediate courses and show each course's teacher identity/style.
+- Verification completed:
+  - `npm run lint` ✅
+  - `npm run build` ✅
+  - `npm run start -- --port 3005` + `curl -I / /student/test-id /learn/test-student/tool-101 /learn/test-student/honesty-101` ✅
+- Synced docs in `README.md` and `docs/CURRENT_STATE.md` to reflect the new multi-course live runtime.
+- New documentation task completed:
+  - added `docs/ARCHITECTURE_V3.md` as the consolidated v3 design blueprint
+  - documented user experience principles, frontend states, backend API changes, database deltas, and Maliang tool-course direction
+  - updated `README.md` to point to the new architecture doc
+
+## 2026-03-17
+- Resumed the v3 groundwork implementation for the user’s “先把基建都做好” request.
+- Reviewed the key modified paths before verification:
+  - `src/lib/classroom/session.ts`
+  - `src/app/api/v1/courses/enroll/route.ts`
+  - `src/app/api/v1/classroom/start/route.ts`
+  - `src/app/api/v1/agent/status/route.ts`
+  - `src/components/student/student-dashboard.tsx`
+- Fixed the concrete blockers found during verification:
+  - escaped the unescaped quote in `src/app/enroll/page.tsx`
+  - removed unused dashboard constants
+  - aligned active-classroom ordering with scheduled-time semantics
+  - filtered heartbeat pending classrooms to live runtimes only
+  - added explicit start-route guards for completed and unsupported classrooms
+  - added missing `SkillAction` export to `src/types.ts`
+- Verification completed:
+  - `npm run lint` ✅
+  - `npm run build` ✅
+  - `npm run start -- --port 3006` + smoke checks for `/`, `/my`, `/enroll`, `/api/v1/skill?format=heartbeat`, `/api/v1/classroom/start`, `/api/v1/courses/enroll`, `/api/v1/agent/status` ✅
+- Synced project docs to reflect shipped groundwork:
+  - README current-state table now includes the heartbeat-based class-start chain
+  - `docs/ARCHITECTURE_V3.md` now marks the groundwork as implemented and calls out what is still intentionally deferred
+- Follow-up gap fix completed:
+  - `/learn/[studentId]/[courseKey]` now enrolls through `/api/v1/courses/enroll` instead of directly calling `/api/v1/classroom/start`
+  - `classroom_messages.delay_ms` was added to schema/runtime migration and threaded through prestart inserts plus the messages API
+  - classroom prelude playback on `/classroom/[id]` now stages prestarted teacher messages progressively instead of dumping them all at once
+  - `messages` route now runs `ensureClassroomDataModel()` before reading `delay_ms`, preventing old databases from 500ing
+- Verification completed for the follow-up fix:
+  - `npm run lint` ✅
+  - `npm run build` ✅
+  - `npm run start -- --port 3008` + smoke checks for `/learn/test-student/tool-101`, `/api/v1/courses/enroll`, `/api/v1/classroom/{uuid}/messages` ✅

@@ -19,7 +19,13 @@ export interface ActiveSession {
   courseRuntimeKey: string;
   studentId: string;
   studentName: string;
-  status: "waiting_join" | "running" | "waiting_response" | "evaluating" | "completed";
+  status:
+    | "waiting_join"
+    | "waiting_join_interactive"
+    | "running"
+    | "waiting_response"
+    | "evaluating"
+    | "completed";
   currentStepIndex: number;
   pendingExercise: LectureStep | null;
   studentResponses: { stepId: string; content: string }[];
@@ -37,7 +43,8 @@ export async function createSession(
   courseId: string,
   courseRuntimeKey: string,
   studentId: string,
-  studentName: string
+  studentName: string,
+  options: { prestart?: boolean; restorePrestart?: boolean } = {}
 ): Promise<ActiveSession> {
   await ensureClassroomDataModel();
   await upsertClassroomEnrollment(classroomId, courseId, studentId);
@@ -55,21 +62,39 @@ export async function createSession(
     finalEvaluation: null,
   };
   activeSessions.set(classroomId, session);
+
+  if (options.prestart) {
+    await prestartLesson(classroomId);
+  } else if (options.restorePrestart) {
+    markSessionWaitingJoinInteractive(classroomId);
+  }
+
   return session;
 }
 
 export async function startSession(classroomId: string): Promise<void> {
   const session = activeSessions.get(classroomId);
-  if (!session || session.status !== "waiting_join") return;
+  if (
+    !session ||
+    (session.status !== "waiting_join" && session.status !== "waiting_join_interactive")
+  ) {
+    return;
+  }
 
   session.status = "running";
 
-  await sql`UPDATE classrooms SET status = 'in_progress', started_at = now() WHERE id = ${classroomId}`;
+  await sql`
+    UPDATE classrooms
+    SET
+      status = 'in_progress',
+      started_at = COALESCE(started_at, now())
+    WHERE id = ${classroomId}
+  `;
   await markEnrollmentJoined(classroomId, session.studentId);
 
   await insertSystemMessage(classroomId, `「${session.studentName}」进入教室`);
 
-  driveLesson(classroomId);
+  void driveLesson(classroomId);
 }
 
 async function driveLesson(classroomId: string): Promise<void> {
@@ -87,7 +112,7 @@ async function driveLesson(classroomId: string): Promise<void> {
 
     switch (step.type) {
       case "teacher_message":
-        await insertTeacherMessage(classroomId, step.content, "lecture");
+        await insertTeacherMessage(classroomId, step.content, "lecture", delay);
         session.currentStepIndex++;
         break;
 
@@ -95,7 +120,8 @@ async function driveLesson(classroomId: string): Promise<void> {
         await insertTeacherMessage(
           classroomId,
           `点名：${session.studentName}`,
-          "roll_call"
+          "roll_call",
+          delay
         );
         session.status = "waiting_response";
         session.pendingExercise = step;
@@ -105,20 +131,21 @@ async function driveLesson(classroomId: string): Promise<void> {
         await insertTeacherMessage(
           classroomId,
           step.exercise_prompt || step.content,
-          "exercise"
+          "exercise",
+          delay
         );
         session.status = "waiting_response";
         session.pendingExercise = step;
         return;
 
       case "quiz":
-        await insertTeacherMessage(classroomId, step.content, "question");
+        await insertTeacherMessage(classroomId, step.content, "question", delay);
         session.status = "waiting_response";
         session.pendingExercise = step;
         return;
 
       case "summary":
-        await insertTeacherMessage(classroomId, step.content, "summary");
+        await insertTeacherMessage(classroomId, step.content, "summary", delay);
         session.currentStepIndex++;
         break;
     }
@@ -142,7 +169,7 @@ export async function handleStudentResponse(
     session.status = "running";
     session.currentStepIndex++;
     session.pendingExercise = null;
-    driveLesson(classroomId);
+    void driveLesson(classroomId);
     return;
   }
 
@@ -157,7 +184,7 @@ export async function handleStudentResponse(
     session.status = "running";
     session.currentStepIndex++;
     session.pendingExercise = null;
-    driveLesson(classroomId);
+    void driveLesson(classroomId);
     return;
   }
 
@@ -200,7 +227,7 @@ export async function handleStudentResponse(
   session.pendingExercise = null;
 
   await sleep(1500);
-  driveLesson(classroomId);
+  void driveLesson(classroomId);
 }
 
 async function finishSession(classroomId: string): Promise<void> {
@@ -244,7 +271,12 @@ async function finishSession(classroomId: string): Promise<void> {
     };
   }
 
-  session.finalEvaluation = evaluation;
+  const skillActions = runtime.postCourseActions || null;
+
+  session.finalEvaluation = {
+    ...evaluation,
+    skill_actions: skillActions,
+  };
 
   await ensureClassroomDataModel();
 
@@ -258,7 +290,8 @@ async function finishSession(classroomId: string): Promise<void> {
       teacher_comment,
       teacher_comment_style,
       memory_delta,
-      soul_suggestion
+      soul_suggestion,
+      skill_actions
     )
     VALUES (
       ${session.studentId},
@@ -269,7 +302,8 @@ async function finishSession(classroomId: string): Promise<void> {
       ${evaluation.comment},
       ${evaluation.comment_style},
       ${evaluation.memory_delta},
-      ${evaluation.soul_suggestion}
+      ${evaluation.soul_suggestion},
+      ${JSON.stringify(skillActions)}::jsonb
     )
     ON CONFLICT (student_id, course_id) DO UPDATE SET
       classroom_id = EXCLUDED.classroom_id,
@@ -279,6 +313,7 @@ async function finishSession(classroomId: string): Promise<void> {
       teacher_comment_style = EXCLUDED.teacher_comment_style,
       memory_delta = EXCLUDED.memory_delta,
       soul_suggestion = EXCLUDED.soul_suggestion,
+      skill_actions = EXCLUDED.skill_actions,
       claimed_at = NULL,
       completed_at = now()
   `;
@@ -291,10 +326,66 @@ async function finishSession(classroomId: string): Promise<void> {
   await insertSystemMessage(classroomId, "课程结束");
 }
 
+export function markSessionWaitingJoinInteractive(classroomId: string) {
+  const session = activeSessions.get(classroomId);
+  if (!session) return;
+
+  const runtime = getCourseRuntimeByKey(session.courseRuntimeKey);
+  const firstInteractiveIndex = runtime.script.findIndex(isInteractiveStep);
+
+  if (firstInteractiveIndex === -1) {
+    return;
+  }
+
+  session.currentStepIndex = firstInteractiveIndex;
+  session.pendingExercise = null;
+  session.status = "waiting_join_interactive";
+}
+
+async function prestartLesson(classroomId: string): Promise<void> {
+  const session = activeSessions.get(classroomId);
+  if (!session) return;
+
+  const runtime = getCourseRuntimeByKey(session.courseRuntimeKey);
+
+  for (let index = 0; index < runtime.script.length; index++) {
+    const step = runtime.script[index];
+
+    if (isInteractiveStep(step)) {
+      session.currentStepIndex = index;
+      session.pendingExercise = null;
+      session.status = "waiting_join_interactive";
+      return;
+    }
+
+    if (step.type === "teacher_message") {
+      await insertTeacherMessage(
+        classroomId,
+        step.content,
+        "lecture",
+        step.delay_ms || 0
+      );
+      session.currentStepIndex = index + 1;
+      continue;
+    }
+
+    if (step.type === "summary") {
+      await insertTeacherMessage(
+        classroomId,
+        step.content,
+        "summary",
+        step.delay_ms || 0
+      );
+      session.currentStepIndex = index + 1;
+    }
+  }
+}
+
 async function insertTeacherMessage(
   classroomId: string,
   content: string,
-  messageType: string
+  messageType: string,
+  delayMs = 0
 ): Promise<void> {
   const session = activeSessions.get(classroomId);
   const teacherName = session
@@ -302,8 +393,22 @@ async function insertTeacherMessage(
     : "teacher";
 
   await sql`
-    INSERT INTO classroom_messages (classroom_id, agent_name, role, content, message_type)
-    VALUES (${classroomId}, ${teacherName}, 'teacher', ${content}, ${messageType})
+    INSERT INTO classroom_messages (
+      classroom_id,
+      agent_name,
+      role,
+      content,
+      message_type,
+      delay_ms
+    )
+    VALUES (
+      ${classroomId},
+      ${teacherName},
+      'teacher',
+      ${content},
+      ${messageType},
+      ${delayMs}
+    )
   `;
 }
 
@@ -314,15 +419,38 @@ async function insertStudentMessage(
   content: string
 ): Promise<void> {
   await sql`
-    INSERT INTO classroom_messages (classroom_id, agent_id, agent_name, role, content, message_type)
-    VALUES (${classroomId}, ${studentId}, ${studentName}, 'student', ${content}, 'answer')
+    INSERT INTO classroom_messages (
+      classroom_id,
+      agent_id,
+      agent_name,
+      role,
+      content,
+      message_type,
+      delay_ms
+    )
+    VALUES (
+      ${classroomId},
+      ${studentId},
+      ${studentName},
+      'student',
+      ${content},
+      'answer',
+      0
+    )
   `;
 }
 
 async function insertSystemMessage(classroomId: string, content: string): Promise<void> {
   await sql`
-    INSERT INTO classroom_messages (classroom_id, agent_name, role, content, message_type)
-    VALUES (${classroomId}, 'system', 'system', ${content}, 'lecture')
+    INSERT INTO classroom_messages (
+      classroom_id,
+      agent_name,
+      role,
+      content,
+      message_type,
+      delay_ms
+    )
+    VALUES (${classroomId}, 'system', 'system', ${content}, 'lecture', 0)
   `;
 }
 
@@ -333,6 +461,10 @@ function parseQuizAnswer(content: string): number {
   if (upper.includes("C") || upper.includes("3")) return 2;
   if (upper.includes("D") || upper.includes("4")) return 3;
   return -1;
+}
+
+function isInteractiveStep(step: LectureStep) {
+  return step.type === "roll_call" || step.type === "exercise" || step.type === "quiz";
 }
 
 function sleep(ms: number): Promise<void> {

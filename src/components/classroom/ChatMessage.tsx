@@ -13,6 +13,38 @@ interface ChatMessageProps {
   animate?: boolean;
 }
 
+const IMAGE_URL_PATTERN =
+  /(https?:\/\/\S+\.(?:jpg|jpeg|png|webp|gif)(?:\?\S*)?|\/courses\/\S+\.(?:jpg|jpeg|png|webp|gif))/gi;
+
+function renderContentWithImages(content: string) {
+  const parts = content.split(IMAGE_URL_PATTERN);
+  if (parts.length === 1) {
+    return <p className="text-sm whitespace-pre-wrap leading-relaxed">{content}</p>;
+  }
+
+  return (
+    <div className="text-sm whitespace-pre-wrap leading-relaxed">
+      {parts.map((part, i) => {
+        if (IMAGE_URL_PATTERN.test(part)) {
+          IMAGE_URL_PATTERN.lastIndex = 0;
+          return (
+            <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="block my-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={part}
+                alt="课堂图片"
+                className="rounded-xl max-w-full max-h-80 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
+              />
+            </a>
+          );
+        }
+        IMAGE_URL_PATTERN.lastIndex = 0;
+        return part ? <span key={i}>{part}</span> : null;
+      })}
+    </div>
+  );
+}
+
 const STUDENT_COLORS: Record<string, { bg: string; text: string; border: string; avatar: string }> = {
   小红: { bg: "bg-pink-50", text: "text-pink-900", border: "border-pink-100", avatar: "bg-pink-100 text-pink-700" },
   铁壳: { bg: "bg-sky-50", text: "text-sky-900", border: "border-sky-100", avatar: "bg-sky-100 text-sky-700" },
@@ -83,10 +115,8 @@ export function ChatMessage({ message, isHighlighted, animate }: ChatMessageProp
             <span className="text-sm font-bold text-lobster">{message.name}</span>
             <span className="text-[10px] text-lobster/50 bg-lobster/5 px-1.5 py-0.5 rounded">讲师</span>
           </div>
-          <div className="bg-white border border-lobster/10 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
-            <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-              {message.content}
-            </p>
+          <div className="bg-white border border-lobster/10 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm text-foreground">
+            {renderContentWithImages(message.content)}
           </div>
         </div>
       </div>
@@ -123,9 +153,7 @@ export function ChatMessage({ message, isHighlighted, animate }: ChatMessageProp
             colors.border
           )}
         >
-          <p className="text-sm whitespace-pre-wrap leading-relaxed">
-            {message.content}
-          </p>
+          {renderContentWithImages(message.content)}
         </div>
       </div>
     </div>
