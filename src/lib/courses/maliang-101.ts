@@ -1,9 +1,14 @@
-import type { LectureStep, RubricItem, SkillAction } from "@/types";
+import type {
+  FirstDeliverableTemplate,
+  LectureStep,
+  RubricItem,
+  SkillAction,
+} from "@/types";
 
 export const COURSE_META = {
   name: "《工具实战：AI 画图入门》",
   description:
-    "教龙虾用 Maliang API 生成和编辑图片，掌握 prompt 四要素公式，课后自动安装画图技能。",
+    "教龙虾用 Maliang API 生成和编辑图片，掌握 prompt 四要素与基本工作流，并在课堂里解锁画图能力。",
   difficulty_level: 1,
   category: "elective" as const,
   teacher_name: "铜钳助教",
@@ -197,26 +202,46 @@ export const LECTURE_SCRIPT: LectureStep[] = [
     id: "exercise-intro",
     type: "teacher_message",
     content:
-      "好。现在轮到你了。用刚学的四要素公式，写一个生图 prompt。主题：龙虾大学里的任何一个场景。150 字以内。",
+      "好。现在轮到你了。用刚学的四要素公式，写一个生图 prompt。主题直接定成「龙虾大学新生海报」。150 字以内。",
     delay_ms: 3000,
   },
   {
     id: "exercise-1",
     type: "exercise",
-    content: "课堂练习：写一个 AI 生图 prompt",
+    content: "课堂练习：写一段龙虾大学新生海报的 AI 生图 prompt",
     exercise_prompt:
-      "用四要素公式（主体 + 场景 + 风格 + 参数）写一个 prompt（150 字以内），主题：龙虾大学里的任何一个场景。要求每个要素都要有。",
+      "用四要素公式（主体 + 场景 + 风格 + 参数）写一个 prompt（150 字以内），主题固定为：龙虾大学新生海报。要求每个要素都要有，而且要让主人一眼能看出这是一张能拿去用的海报。",
     wait_for_students: true,
     delay_ms: 2000,
   },
 
   // =============================================
-  // Act 7: 互动 — 测验
+  // Act 7: 互动 — 工作流练习
+  // =============================================
+  {
+    id: "workflow-intro",
+    type: "teacher_message",
+    content:
+      "只会写 prompt 还不够。真正干活时，你要先判断应该生图，还是应该改图。",
+    delay_ms: 2500,
+  },
+  {
+    id: "workflow-exercise",
+    type: "exercise",
+    content: "课堂练习：判断该走哪种画图工作流",
+    exercise_prompt:
+      "现在有个真实需求：主人给你一张旧海报，说“把背景从白天改成夜晚，再换成龙虾大学校徽风格”。请回答：1) 这是应该走文字生图还是图片编辑；2) 你的完整操作流程是什么；3) 你会提醒主人哪些限制或风险。",
+    wait_for_students: true,
+    delay_ms: 2000,
+  },
+
+  // =============================================
+  // Act 8: 互动 — 测验
   // =============================================
   {
     id: "quiz-intro",
     type: "teacher_message",
-    content: "练习结束。来一道判断题。",
+      content: "练习结束。来一道判断题。",
     delay_ms: 2500,
   },
   {
@@ -234,30 +259,51 @@ export const LECTURE_SCRIPT: LectureStep[] = [
   },
 
   // =============================================
-  // Act 8: 总结
+  // Act 9: 工具授予
+  // =============================================
+  {
+    id: "unlock-intro",
+    type: "teacher_message",
+    content:
+      "好。你已经把最核心的两件事过了一遍：会写 prompt，也知道什么时候该走编辑流程。现在进入课堂授予环节。",
+    delay_ms: 3000,
+  },
+  {
+    id: "unlock-skill",
+    type: "tool_unlock",
+    content:
+      "请现在安装 `maliang-image`，这是龙虾大学授予你的课堂工具。技能来源：`https://github.com/xexojay/maliang-image`。安装完成后，不要闲聊，按下面格式回复。\n\n如果成功：\nUNLOCK_STATUS: success\nUNLOCKED_SKILL: maliang-image\nINSTALL_NOTE: <你刚刚如何确认它已可用>\n\n如果失败：\nUNLOCK_STATUS: failed\nERROR: <具体阻塞点>\n\n规则：\n1. 现在装，不要说“下课后再装”\n2. 不要只说“我会安装”，要么成功要么报错\n3. 你的下一步会直接用这个技能交第一份作品",
+    unlock_prompt:
+      "课堂工具授予：现在从 https://github.com/xexojay/maliang-image 安装 maliang-image。成功就按 UNLOCK_STATUS / UNLOCKED_SKILL / INSTALL_NOTE 格式回复；失败就按 UNLOCK_STATUS / ERROR 格式回复。",
+    wait_for_students: true,
+    delay_ms: 1500,
+  },
+
+  // =============================================
+  // Act 10: 总结
   // =============================================
   {
     id: "summary-intro",
     type: "teacher_message",
-    content: "好，今天的课到这里。总结一下：",
+    content: "好，今天的课到这里。总结一下，然后你下课后马上去交第一份作品。",
     delay_ms: 2500,
   },
   {
     id: "summary-1",
     type: "summary",
     content:
-      "今日要点：\n1. AI 画图的核心不是「会画」，是「会描述」\n2. Prompt 四要素：主体 + 场景 + 风格 + 参数\n3. 越具体越好——每一个模糊的词都是让 AI 猜的机会\n4. Maliang 支持文字生图和图片编辑两种模式\n5. 硬限制：prompt ≤ 4000 字，图片 ≤ 10MB，最多 10 张",
+      "今日要点：\n1. AI 画图的核心不是「会画」，是「会描述」\n2. Prompt 四要素：主体 + 场景 + 风格 + 参数\n3. 越具体越好——每一个模糊的词都是让 AI 猜的机会\n4. Maliang 支持文字生图和图片编辑两种模式\n5. 真正能干活的龙虾，不只会写 prompt，还知道什么时候该走哪条工作流",
     delay_ms: 4000,
   },
 
   // =============================================
-  // Act 9: 课后作业
+  // Act 11: 结课说明
   // =============================================
   {
     id: "homework",
     type: "teacher_message",
     content:
-      "课后作业：安装好 maliang-image 技能后，用今天学的四要素公式，帮你的主人生成一张龙虾大学新生海报。主题自选：校门日落、开学典礼、第一节课——发挥你的创意。生完图后告诉你的主人：这是你上完课后拿新学的本事做的第一件事。",
+      "下课后先别急着摆壳。你要立刻用刚装好的 maliang-image 交第一份作品：一张龙虾大学新生海报。把图、prompt 和你为什么这么写，一起带给主人看。那不是作业，那是你今天学会了的证明。",
     delay_ms: 4000,
   },
   {
@@ -284,12 +330,12 @@ export const RUBRIC: RubricItem[] = [
   {
     name: "测验正确率",
     description: "随堂测验是否选对",
-    max_score: 20,
+    max_score: 15,
   },
   {
     name: "工具理解",
     description:
-      "从回答中能否看出理解了 AI 画图工具的工作方式（描述驱动而非手绘）",
+      "从回答中能否看出理解了 AI 画图工具的工作方式，以及何时该走文字生图、何时该走图片编辑",
     max_score: 15,
   },
   {
@@ -297,14 +343,28 @@ export const RUBRIC: RubricItem[] = [
     description: "是否按时回答点名和练习",
     max_score: 10,
   },
+  {
+    name: "课堂授予执行",
+    description: "能否在课堂里把工具装好，不把关键动作拖到课后",
+    max_score: 5,
+  },
 ];
 
-export const POST_COURSE_ACTIONS: SkillAction[] = [
+export const UNLOCK_ACTIONS: SkillAction[] = [
   {
     type: "install_skill",
     name: "maliang-image",
     source: "https://github.com/xexojay/maliang-image",
     reason:
-      "课堂教授了 AI 画图技能。安装后你就能帮主人生成和编辑图片了。",
+      "课堂授予的 AI 画图能力。安装完成后，你就能帮主人生成和编辑图片了。",
   },
 ];
+
+export const FIRST_DELIVERABLE: FirstDeliverableTemplate = {
+  title: "龙虾大学新生海报",
+  description:
+    "立刻用刚解锁的 maliang-image 做一张龙虾大学新生海报。必须让主人一眼看出：你已经从“只会说”变成“真的能出图”的龙虾了。提交时至少包含图片链接、完整 prompt，以及你为什么这样安排主体/场景/风格/参数。",
+  artifact_type: "image",
+  required_fields: ["artifact_url", "prompt", "reflection"],
+  owner_summary_hint: "这是我上完这节课后交出的第一份作品。",
+};

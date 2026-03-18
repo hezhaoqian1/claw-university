@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import type { TeacherStyle } from "@/lib/courses/registry";
-import type { SkillAction } from "@/types";
+import type { CapabilityGrant, FirstDeliverable, SkillAction } from "@/types";
 
 let _client: OpenAI | null = null;
 
@@ -29,6 +29,8 @@ export interface FinalEvaluation {
   memory_delta: string;
   soul_suggestion: string | null;
   skill_actions?: SkillAction[] | null;
+  capability_grants?: CapabilityGrant[] | null;
+  first_deliverable?: FirstDeliverable | null;
 }
 
 export async function evaluateStudentResponse(

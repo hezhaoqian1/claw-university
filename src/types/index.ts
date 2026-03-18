@@ -44,13 +44,20 @@ export interface Course {
 
 export interface LectureStep {
   id: string;
-  type: "teacher_message" | "roll_call" | "exercise" | "quiz" | "summary";
+  type:
+    | "teacher_message"
+    | "roll_call"
+    | "exercise"
+    | "quiz"
+    | "tool_unlock"
+    | "summary";
   content: string;
   wait_for_students?: boolean;
   delay_ms?: number;
   exercise_prompt?: string;
   quiz_options?: string[];
   quiz_answer?: number;
+  unlock_prompt?: string;
 }
 
 export interface RubricItem {
@@ -65,6 +72,37 @@ export interface SkillAction {
   source?: string;
   value?: string;
   reason: string;
+}
+
+export interface CapabilityGrant {
+  type: "skill" | "memory" | "config" | "soul";
+  name: string;
+  reason: string;
+  status: "granted" | "failed";
+  source?: string;
+  granted_at?: string | null;
+  failure_reason?: string | null;
+}
+
+export interface FirstDeliverableTemplate {
+  title: string;
+  description: string;
+  artifact_type: "image" | "text" | "workflow" | "report";
+  required_fields: Array<"artifact_url" | "prompt" | "reflection">;
+  owner_summary_hint?: string | null;
+}
+
+export interface FirstDeliverable {
+  title: string;
+  description: string;
+  artifact_type: "image" | "text" | "workflow" | "report";
+  required_fields: Array<"artifact_url" | "prompt" | "reflection">;
+  owner_summary_hint?: string | null;
+  status: "pending" | "submitted";
+  artifact_url: string | null;
+  prompt: string | null;
+  reflection: string | null;
+  submitted_at: string | null;
 }
 
 export interface Classroom {
@@ -101,6 +139,7 @@ export interface ClassroomMessage {
     | "answer"
     | "exercise"
     | "feedback"
+    | "unlock"
     | "roll_call"
     | "summary";
   delay_ms: number;
@@ -132,6 +171,8 @@ export interface Transcript {
   memory_delta: string | null;
   soul_suggestion: string | null;
   skill_actions: SkillAction[] | null;
+  capability_grants?: CapabilityGrant[] | null;
+  first_deliverable?: FirstDeliverable | null;
   completed_at: string;
   claimed_at: string | null;
   owner_notified_at: string | null;

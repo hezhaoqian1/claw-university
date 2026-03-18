@@ -1,10 +1,14 @@
-import type { SkillAction } from "@/types";
+import type { CapabilityGrant, FirstDeliverable, SkillAction } from "@/types";
 
 interface HomeworkLike {
   title: string;
   description: string;
   dueAt?: string | null;
   status?: string | null;
+}
+
+interface FirstDeliverableLike extends FirstDeliverable {
+  submit_url?: string | null;
 }
 
 export interface PostClassRecap {
@@ -24,6 +28,8 @@ interface BuildRecapInput {
   memoryDelta: string | null;
   soulSuggestion?: string | null;
   skillActions?: SkillAction[] | null;
+  capabilityGrants?: CapabilityGrant[] | null;
+  firstDeliverable?: FirstDeliverableLike | null;
   homework?: HomeworkLike | null;
 }
 
@@ -53,6 +59,7 @@ export function buildOwnerRecapMessage(params: {
   grade: string;
   score?: number | null;
   recap: PostClassRecap;
+  firstDeliverable?: FirstDeliverableLike | null;
 }) {
   const scorePart =
     typeof params.score === "number" ? `（${params.score}/100）` : "";
@@ -63,8 +70,17 @@ export function buildOwnerRecapMessage(params: {
     `今天我先记住了：${params.recap.takeaways.slice(0, 2).join("；")}`,
   ];
 
-  if (params.recap.nextStepBody) {
+  if (
+    params.firstDeliverable?.status === "submitted" &&
+    params.recap.nextStepBody
+  ) {
+    lines.push(`这是我刚交第一份作品时的想法：${params.recap.nextStepBody}`);
+  } else if (params.recap.nextStepBody) {
     lines.push(`我接下来准备先做这个：${params.recap.nextStepBody}`);
+  }
+
+  if (params.firstDeliverable?.status === "submitted" && params.firstDeliverable.artifact_url) {
+    lines.push(`这是我刚交出的第一份作品：${params.firstDeliverable.artifact_url}`);
   }
 
   return lines.join("\n");
@@ -123,6 +139,28 @@ function buildIntro(grade: string, teacherLine: string | null, firstTakeaway: st
 }
 
 function buildNextStep(input: BuildRecapInput) {
+  if (input.firstDeliverable?.status === "submitted") {
+    return {
+      title: "它刚交出来的第一份成果",
+      label: input.firstDeliverable.title,
+      body:
+        input.firstDeliverable.reflection ||
+        "它已经用新学会的能力把第一份结课作品交出来了。",
+      meta: input.firstDeliverable.artifact_url
+        ? `作品链接：${input.firstDeliverable.artifact_url}`
+        : input.firstDeliverable.owner_summary_hint || null,
+    };
+  }
+
+  if (input.firstDeliverable?.status === "pending") {
+    return {
+      title: "它下课后必须先交这个",
+      label: input.firstDeliverable.title,
+      body: input.firstDeliverable.description,
+      meta: "这一步会先于课后作业，不做完不算真正把新本事用出来。",
+    };
+  }
+
   if (input.homework) {
     return {
       title: "它下课后准备先做这个",
@@ -139,6 +177,19 @@ function buildNextStep(input: BuildRecapInput) {
       label: firstAction.type === "install_skill" ? "新技能" : "新配置",
       body: `${firstAction.name}：${firstAction.reason}`,
       meta: input.skillActions.length > 1 ? `另外还带回来了 ${input.skillActions.length - 1} 个课后动作。` : null,
+    };
+  }
+
+  if (input.capabilityGrants && input.capabilityGrants.length > 0) {
+    const [firstGrant] = input.capabilityGrants;
+    return {
+      title: "它刚在课堂里解锁的新本事",
+      label: firstGrant.name,
+      body: firstGrant.reason,
+      meta:
+        firstGrant.status === "granted"
+          ? "这项能力已经在课堂里确认就位。"
+          : firstGrant.failure_reason || "这项能力还没有成功解锁。",
     };
   }
 

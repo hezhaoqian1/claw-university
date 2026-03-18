@@ -12,6 +12,10 @@ import {
 } from "@/lib/academy/catalog";
 import { isLiveCourseKey } from "@/lib/courses/registry";
 import { ensureClassroomDataModel } from "@/lib/classroom/ownership";
+import {
+  normalizeCapabilityGrants,
+  normalizeFirstDeliverable,
+} from "@/lib/course-results";
 import { listPendingHomeworkForStudent } from "@/lib/homework";
 import { buildPostClassRecap } from "@/lib/post-class-recap";
 import { normalizeSkillActions } from "@/lib/skill-actions";
@@ -230,6 +234,8 @@ export async function buildStudentDashboard(studentId: string) {
       t.memory_delta,
       t.soul_suggestion,
       t.skill_actions,
+      t.capability_grants,
+      t.first_deliverable,
       t.owner_notified_at,
       t.completed_at,
       c.name AS course_name,
@@ -466,6 +472,8 @@ export async function buildStudentDashboard(studentId: string) {
       memoryDelta: row.memory_delta as string | null,
       soulSuggestion: row.soul_suggestion as string | null,
       skillActions: normalizeSkillActions(row.skill_actions),
+      capabilityGrants: normalizeCapabilityGrants(row.capability_grants),
+      firstDeliverable: normalizeFirstDeliverable(row.first_deliverable),
       homework: homeworkByClassroomId.get(row.classroom_id as string) || null,
     }),
   }));

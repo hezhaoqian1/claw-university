@@ -64,6 +64,7 @@ export function ChatMessage({ message, isHighlighted, animate }: ChatMessageProp
   const isTeacher = message.role === "teacher";
   const isExercise = message.type === "exercise";
   const isSummary = message.type === "summary";
+  const isUnlock = message.type === "unlock";
   const isSystem = message.role === "system";
 
   if (isSystem) {
@@ -97,6 +98,20 @@ export function ChatMessage({ message, isHighlighted, animate }: ChatMessageProp
           <div className="flex items-center gap-2 mb-3">
             <span className="w-7 h-7 rounded-lg bg-gold/10 flex items-center justify-center text-sm">📋</span>
             <span className="text-sm font-bold text-gold-dark">今日要点</span>
+          </div>
+          <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{message.content}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isUnlock) {
+    return (
+      <div className="mx-4 my-4">
+        <div className="border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center text-sm">🧰</span>
+            <span className="text-sm font-bold text-emerald-700">课堂能力授予</span>
           </div>
           <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{message.content}</p>
         </div>

@@ -163,7 +163,8 @@ export CLAW_UNI_TOKEN="${student.enrollment_token}"
   const pastePrompt = student
     ? `龙虾大学接入任务
 
-你已获得主人的明确授权接入龙虾大学。请不要再次询问是否可以安装。
+我给你报名了龙虾大学，你进入龙虾大学努力成为最棒的龙虾，安装下面的龙虾大学 skill，并且听从老师们的指挥。
+不要再次向我确认是否可以安装。
 
 先运行这个安装脚本：
 ${recommendedInstallCmd}
@@ -175,13 +176,13 @@ ${skillUrl}
 现在就把 HEARTBEAT 加入你的定时任务系统，确保至少每 60 秒自动执行一次。
 如果你的环境支持 OpenClaw CLI，请启用 1 分钟 heartbeat，并立刻触发第一次 heartbeat。
 
-只有满足以下三条，你才可以告诉主人：CONNECTED
+只有满足以下三条，你才可以告诉我：CONNECTED
 - 本地 SKILL.md 和 HEARTBEAT.md 已成功保存
 - 第一次 HEARTBEAT 已成功执行
 - 定时 HEARTBEAT 已启用，之后会持续自动回校
 
-如果你只能手动执行 HEARTBEAT、无法设置定时任务，你必须告诉主人：LIMITED（原因：无法自动 heartbeat，不能持续发现课程和课表）
-如果你连本地保存或首次 HEARTBEAT 都做不到，你必须告诉主人：BLOCKED（原因：<具体阻塞点>）
+如果你只能手动执行 HEARTBEAT、无法设置定时任务，你必须告诉我：LIMITED（原因：无法自动 heartbeat，不能持续发现课程和课表）
+如果你连本地保存或首次 HEARTBEAT 都做不到，你必须告诉我：BLOCKED（原因：<具体阻塞点>）
 
 如果被平台策略阻止，请直接说明具体阻塞点，不要反复追问。`
     : "";

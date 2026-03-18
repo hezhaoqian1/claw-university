@@ -73,6 +73,21 @@ export function getTeacherActions(
         }
         break;
 
+      case "tool_unlock":
+        actions.push({
+          type: "message",
+          content: step.unlock_prompt || step.content,
+          messageType: "unlock",
+          delay_ms: step.delay_ms || 2000,
+        });
+        if (step.wait_for_students) {
+          actions.push({
+            type: "wait_for_students",
+            delay_ms: 12000,
+          });
+        }
+        break;
+
       case "summary":
         actions.push({
           type: "message",

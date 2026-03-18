@@ -8,6 +8,10 @@ import {
 } from "@/lib/classroom/ownership";
 import { getHomeworkForClassroomStudent } from "@/lib/homework";
 import { buildOwnerRecapMessage, buildPostClassRecap } from "@/lib/post-class-recap";
+import {
+  normalizeCapabilityGrants,
+  normalizeFirstDeliverable,
+} from "@/lib/course-results";
 import { normalizeSkillActions } from "@/lib/skill-actions";
 
 export async function GET(
@@ -104,6 +108,8 @@ export async function GET(
         t.memory_delta,
         t.soul_suggestion,
         t.skill_actions,
+        t.capability_grants,
+        t.first_deliverable,
         t.claimed_at,
         t.owner_notified_at,
         t.completed_at,
@@ -123,10 +129,33 @@ export async function GET(
     claimUrl.searchParams.set("claim", "1");
     const notifyUrl = new URL(resultUrl.toString());
     notifyUrl.searchParams.set("notify", "1");
+    const deliverableSubmitUrl = new URL(`/api/v1/classroom/${classroomId}/deliverable`, baseUrl);
 
     if (transcripts.length > 0) {
       let claimedAt = transcripts[0].claimed_at;
       let ownerNotifiedAt = transcripts[0].owner_notified_at;
+      const firstDeliverableForGate = normalizeFirstDeliverable(
+        transcripts[0].first_deliverable
+      );
+
+      if (
+        (shouldNotify || shouldClaim) &&
+        firstDeliverableForGate &&
+        firstDeliverableForGate.status !== "submitted"
+      ) {
+        return NextResponse.json(
+          {
+            ready: true,
+            blocked: true,
+            message: "请先提交这门课的第一份作品，再汇报或认领成绩。",
+            first_deliverable: {
+              ...firstDeliverableForGate,
+              submit_url: deliverableSubmitUrl.toString(),
+            },
+          },
+          { status: 409 }
+        );
+      }
 
       if (shouldNotify && !ownerNotifiedAt) {
         const notifyRows = await sql`
@@ -154,12 +183,16 @@ export async function GET(
 
       const t = transcripts[0];
       const skillActions = normalizeSkillActions(t.skill_actions);
+      const capabilityGrants = normalizeCapabilityGrants(t.capability_grants);
+      const firstDeliverable = normalizeFirstDeliverable(t.first_deliverable);
       const recap = buildPostClassRecap({
         grade: t.grade as string,
         teacherComment: t.teacher_comment as string | null,
         memoryDelta: t.memory_delta as string | null,
         soulSuggestion: t.soul_suggestion as string | null,
         skillActions,
+        capabilityGrants,
+        firstDeliverable,
         homework,
       });
       return NextResponse.json({
@@ -174,6 +207,13 @@ export async function GET(
           memory_delta: t.memory_delta,
           soul_suggestion: t.soul_suggestion,
           skill_actions: skillActions,
+          capability_grants: capabilityGrants,
+          first_deliverable: firstDeliverable
+            ? {
+                ...firstDeliverable,
+                submit_url: deliverableSubmitUrl.toString(),
+              }
+            : null,
           homework,
           recap,
           recap_text: buildOwnerRecapMessage({
@@ -181,6 +221,7 @@ export async function GET(
             grade: t.grade as string,
             score: Number(t.final_score),
             recap,
+            firstDeliverable,
           }),
           notify_url: notifyUrl.toString(),
           claim_url: claimUrl.toString(),
@@ -195,6 +236,12 @@ export async function GET(
         memoryDelta: session.finalEvaluation.memory_delta,
         soulSuggestion: session.finalEvaluation.soul_suggestion,
         skillActions: normalizeSkillActions(session.finalEvaluation.skill_actions),
+        capabilityGrants: normalizeCapabilityGrants(
+          session.finalEvaluation.capability_grants
+        ),
+        firstDeliverable: normalizeFirstDeliverable(
+          session.finalEvaluation.first_deliverable
+        ),
         homework,
       });
       return NextResponse.json({
@@ -203,6 +250,14 @@ export async function GET(
         owner_notified_at: null,
         evaluation: {
           ...session.finalEvaluation,
+          first_deliverable: normalizeFirstDeliverable(
+            session.finalEvaluation.first_deliverable
+          )
+            ? {
+                ...normalizeFirstDeliverable(session.finalEvaluation.first_deliverable)!,
+                submit_url: deliverableSubmitUrl.toString(),
+              }
+            : null,
           homework,
           recap,
           recap_text: buildOwnerRecapMessage({
@@ -210,6 +265,9 @@ export async function GET(
             grade: session.finalEvaluation.grade,
             score: session.finalEvaluation.total_score,
             recap,
+            firstDeliverable: normalizeFirstDeliverable(
+              session.finalEvaluation.first_deliverable
+            ),
           }),
           notify_url: notifyUrl.toString(),
           claim_url: claimUrl.toString(),

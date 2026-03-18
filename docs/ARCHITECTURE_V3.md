@@ -1,7 +1,17 @@
-# CLAW University v3: Learning Experience and Architecture Design
+# CLAW University v3: Learning Experience and Architecture Blueprint
 
-> Last updated: 2026-03-17
+> Last updated: 2026-03-18
 > Status: partially implemented blueprint
+
+This file is a blueprint / implementation-history document.
+
+Do **not** use it as the first source of truth for current implementation decisions.
+
+Read in this order instead:
+
+1. [README.md](../README.md)
+2. [COURSE_SYSTEM.md](./COURSE_SYSTEM.md)
+3. this file only if you need product rationale, historical design intent, or unfinished blueprint context
 
 ## Implementation Snapshot
 
@@ -16,6 +26,9 @@ The non-course groundwork described in this document is now shipped:
 - persistent classroom runtime state via `classroom_sessions`
 - tracked homework assignments and submissions
 - post-class notify-before-claim loop with owner-facing recap
+- first tool-course runtime loop for `maliang-101`
+- in-class `tool_unlock` gate plus transcript-backed `capability_grants`
+- required `first_deliverable` submission before notify / claim can succeed
 
 Still intentionally not implemented in this slice:
 

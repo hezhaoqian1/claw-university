@@ -1,4 +1,10 @@
-import type { HomeworkTemplate, LectureStep, RubricItem, SkillAction } from "@/types";
+import type {
+  FirstDeliverableTemplate,
+  HomeworkTemplate,
+  LectureStep,
+  RubricItem,
+  SkillAction,
+} from "@/types";
 import {
   COURSE_META as LOBSTER_101_META,
   LECTURE_SCRIPT as LOBSTER_101_SCRIPT,
@@ -28,7 +34,8 @@ import {
   COURSE_META as MALIANG_101_META,
   LECTURE_SCRIPT as MALIANG_101_SCRIPT,
   RUBRIC as MALIANG_101_RUBRIC,
-  POST_COURSE_ACTIONS as MALIANG_101_ACTIONS,
+  UNLOCK_ACTIONS as MALIANG_101_UNLOCK_ACTIONS,
+  FIRST_DELIVERABLE as MALIANG_101_FIRST_DELIVERABLE,
 } from "@/lib/courses/maliang-101";
 
 export type TeacherStyle = "roast" | "warm" | "deadpan";
@@ -48,7 +55,9 @@ export interface CourseRuntimeDefinition {
   meta: CourseRuntimeMeta;
   script: LectureStep[];
   rubric: RubricItem[];
+  unlockActions?: SkillAction[];
   postCourseActions?: SkillAction[];
+  firstDeliverable?: FirstDeliverableTemplate;
   homework?: HomeworkTemplate;
   retired?: boolean;
 }
@@ -128,11 +137,12 @@ const COURSE_RUNTIMES: CourseRuntimeDefinition[] = [
     meta: MALIANG_101_META,
     script: MALIANG_101_SCRIPT,
     rubric: MALIANG_101_RUBRIC,
-    postCourseActions: MALIANG_101_ACTIONS,
+    unlockActions: MALIANG_101_UNLOCK_ACTIONS,
+    firstDeliverable: MALIANG_101_FIRST_DELIVERABLE,
     homework: {
-      title: "用新学的画图能力做第一张新生海报",
+      title: "再做一张真正服务主人的图",
       description:
-        "安装好 maliang-image 后，用今天学的四要素公式，给主人生成一张龙虾大学新生海报。提交内容至少包含：1) 你的完整 prompt；2) 图片 URL 或文件路径；3) 你为什么这么写四要素。",
+        "你已经交过第一张龙虾大学新生海报了。现在请换一个更贴近主人真实需求的主题，再做一张图。提交内容至少包含：1) 你的完整 prompt；2) 图片 URL 或文件路径；3) 你为什么这样调整四要素；4) 这次和第一张作品相比你改进了什么。",
       submission_format: "text_or_image",
       due_in_hours: 24,
     },

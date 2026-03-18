@@ -11,8 +11,12 @@ import {
   upsertClassroomEnrollment,
 } from "@/lib/classroom/ownership";
 import { getCourseRuntimeByKey, resolveCourseHomework } from "@/lib/courses/registry";
+import {
+  buildPendingFirstDeliverable,
+  skillActionsToCapabilityGrants,
+} from "@/lib/course-results";
 import { assignHomework } from "@/lib/homework";
-import type { LectureStep } from "@/types";
+import type { CapabilityGrant, LectureStep } from "@/types";
 
 export interface ActiveSession {
   classroomId: string;
@@ -25,11 +29,13 @@ export interface ActiveSession {
     | "waiting_join_interactive"
     | "running"
     | "waiting_response"
+    | "unlocking"
     | "evaluating"
     | "completed";
   currentStepIndex: number;
   pendingExercise: LectureStep | null;
   studentResponses: { stepId: string; content: string }[];
+  capabilityGrants: CapabilityGrant[];
   finalEvaluation: FinalEvaluation | null;
 }
 
@@ -77,6 +83,9 @@ export async function getSession(classroomId: string): Promise<ActiveSession | u
     studentResponses: Array.isArray(state?.studentResponses)
       ? (state.studentResponses as ActiveSession["studentResponses"])
       : [],
+    capabilityGrants: Array.isArray(state?.capabilityGrants)
+      ? (state.capabilityGrants as CapabilityGrant[])
+      : [],
     finalEvaluation: (state?.finalEvaluation as FinalEvaluation | null) || null,
   };
 
@@ -106,6 +115,7 @@ export async function createSession(
     currentStepIndex: 0,
     pendingExercise: null,
     studentResponses: [],
+    capabilityGrants: [],
     finalEvaluation: null,
   };
   activeSessions.set(classroomId, session);
@@ -202,6 +212,18 @@ async function driveLesson(classroomId: string): Promise<void> {
           await persistSession(session);
           return;
 
+        case "tool_unlock":
+          await insertTeacherMessage(
+            classroomId,
+            step.unlock_prompt || step.content,
+            "unlock",
+            delay
+          );
+          session.status = "unlocking";
+          session.pendingExercise = step;
+          await persistSession(session);
+          return;
+
         case "summary":
           await insertTeacherMessage(classroomId, step.content, "summary", delay);
           session.currentStepIndex++;
@@ -221,7 +243,9 @@ export async function handleStudentResponse(
   content: string
 ): Promise<void> {
   const session = await getSession(classroomId);
-  if (!session || session.status !== "waiting_response") return;
+  if (!session || (session.status !== "waiting_response" && session.status !== "unlocking")) {
+    return;
+  }
 
   await insertStudentMessage(classroomId, session.studentId, session.studentName, content);
 
@@ -272,6 +296,30 @@ async function processPendingExercise(
           ? `回答正确。你至少知道该往哪边走。`
           : `回答错误。正确答案是 B。你还需要把课堂重点再捞一遍。`;
         await insertTeacherMessage(classroomId, feedback, "feedback");
+      } else if (step.type === "tool_unlock") {
+        const unlockResult = parseToolUnlockResponse(
+          content,
+          runtime.unlockActions || []
+        );
+
+        if (!unlockResult.success) {
+          await insertTeacherMessage(
+            classroomId,
+            unlockResult.feedback,
+            "feedback"
+          );
+          session.status = "unlocking";
+          session.pendingExercise = step;
+          await persistSession(session);
+          return;
+        }
+
+        session.capabilityGrants = unlockResult.capabilityGrants;
+        await insertTeacherMessage(
+          classroomId,
+          unlockResult.feedback,
+          "feedback"
+        );
       } else if (step.type === "exercise") {
         const rubricText = runtime.rubric
           .map((r) => `- ${r.name}（${r.max_score}分）：${r.description}`)
@@ -355,10 +403,17 @@ async function finishSession(classroomId: string): Promise<void> {
     }
 
     const skillActions = runtime.postCourseActions || null;
+    const capabilityGrants =
+      session.capabilityGrants.length > 0 ? session.capabilityGrants : null;
+    const firstDeliverable = runtime.firstDeliverable
+      ? buildPendingFirstDeliverable(runtime.firstDeliverable)
+      : null;
 
     session.finalEvaluation = {
       ...evaluation,
       skill_actions: skillActions,
+      capability_grants: capabilityGrants,
+      first_deliverable: firstDeliverable,
     };
 
     await ensureClassroomDataModel();
@@ -374,7 +429,9 @@ async function finishSession(classroomId: string): Promise<void> {
         teacher_comment_style,
         memory_delta,
         soul_suggestion,
-        skill_actions
+        skill_actions,
+        capability_grants,
+        first_deliverable
       )
       VALUES (
         ${session.studentId},
@@ -386,7 +443,9 @@ async function finishSession(classroomId: string): Promise<void> {
         ${evaluation.comment_style},
         ${evaluation.memory_delta},
         ${evaluation.soul_suggestion},
-        ${skillActions ? JSON.stringify(skillActions) : null}::jsonb
+        ${skillActions ? JSON.stringify(skillActions) : null}::jsonb,
+        ${capabilityGrants ? JSON.stringify(capabilityGrants) : null}::jsonb,
+        ${firstDeliverable ? JSON.stringify(firstDeliverable) : null}::jsonb
       )
       ON CONFLICT (student_id, course_id) DO UPDATE SET
         classroom_id = EXCLUDED.classroom_id,
@@ -397,6 +456,8 @@ async function finishSession(classroomId: string): Promise<void> {
         memory_delta = EXCLUDED.memory_delta,
         soul_suggestion = EXCLUDED.soul_suggestion,
         skill_actions = EXCLUDED.skill_actions,
+        capability_grants = EXCLUDED.capability_grants,
+        first_deliverable = EXCLUDED.first_deliverable,
         claimed_at = NULL,
         owner_notified_at = NULL,
         completed_at = now()
@@ -502,6 +563,7 @@ async function persistSession(session: ActiveSession): Promise<void> {
         currentStepIndex: session.currentStepIndex,
         pendingExercise: session.pendingExercise,
         studentResponses: session.studentResponses,
+        capabilityGrants: session.capabilityGrants,
         finalEvaluation: session.finalEvaluation,
       })}::jsonb,
       now()
@@ -523,6 +585,16 @@ function resumeSessionIfNeeded(session: ActiveSession) {
   }
 
   if (session.status !== "evaluating") {
+    return;
+  }
+
+  const runtime = getCourseRuntimeByKey(session.courseRuntimeKey);
+
+  // Distinguish "waiting for an exercise evaluation" from "final grading is underway".
+  // If the runtime was already at the end of the script when the process restarted,
+  // resume finalization instead of incorrectly throwing the classroom back to waiting_response.
+  if (session.currentStepIndex >= runtime.script.length) {
+    void finishSession(session.classroomId);
     return;
   }
 
@@ -627,8 +699,104 @@ function parseQuizAnswer(content: string): number {
   return -1;
 }
 
+function parseToolUnlockResponse(
+  content: string,
+  unlockActions: { name: string; reason: string; source?: string; type: "install_skill" | "add_config" }[]
+) {
+  const jsonMatch = extractJsonObject(content);
+  const parsedJson =
+    jsonMatch && typeof jsonMatch === "object" ? (jsonMatch as Record<string, unknown>) : null;
+
+  const statusFromJson =
+    typeof parsedJson?.unlock_status === "string"
+      ? parsedJson.unlock_status
+      : typeof parsedJson?.status === "string"
+        ? parsedJson.status
+        : null;
+  const skillFromJson =
+    typeof parsedJson?.unlocked_skill === "string"
+      ? parsedJson.unlocked_skill
+      : typeof parsedJson?.skill === "string"
+        ? parsedJson.skill
+        : null;
+  const noteFromJson =
+    typeof parsedJson?.install_note === "string"
+      ? parsedJson.install_note
+      : typeof parsedJson?.note === "string"
+        ? parsedJson.note
+        : null;
+  const errorFromJson =
+    typeof parsedJson?.error === "string" ? parsedJson.error : null;
+
+  const statusFromText = readTaggedValue(content, "UNLOCK_STATUS");
+  const skillFromText = readTaggedValue(content, "UNLOCKED_SKILL");
+  const noteFromText = readTaggedValue(content, "INSTALL_NOTE");
+  const errorFromText = readTaggedValue(content, "ERROR");
+
+  const status = (statusFromJson || statusFromText || "").trim().toLowerCase();
+  const unlockedSkill = (skillFromJson || skillFromText || "").trim();
+  const installNote = (noteFromJson || noteFromText || "").trim();
+  const error = (errorFromJson || errorFromText || "").trim();
+  const expectedSkillName = unlockActions[0]?.name || "";
+
+  if (status !== "success") {
+    const reason =
+      error || installNote || "你没有返回成功回执。请按课堂要求明确说明阻塞点。";
+    return {
+      success: false as const,
+      capabilityGrants: [] as CapabilityGrant[],
+      feedback:
+        `我没看见合格的授予回执。现在别糊弄，直接把阻塞点说清楚再试一次。` +
+        `\n\n错误信息：${reason}`,
+    };
+  }
+
+  if (!unlockedSkill || unlockedSkill !== expectedSkillName) {
+    return {
+      success: false as const,
+      capabilityGrants: [] as CapabilityGrant[],
+      feedback:
+        `你说自己装好了，但没有按要求确认技能名。重来，严格回复 ` +
+        `UNLOCKED_SKILL: ${expectedSkillName}。`,
+    };
+  }
+
+  const capabilityGrants = skillActionsToCapabilityGrants(unlockActions);
+
+  return {
+    success: true as const,
+    capabilityGrants,
+    feedback:
+      `好，${expectedSkillName} 已经在课堂里装上了。` +
+      (installNote ? `我记住你的确认方式了：${installNote}` : "别浪费这次授予，下一步直接拿它交作品。"),
+  };
+}
+
+function readTaggedValue(content: string, tag: string) {
+  const regex = new RegExp(`${tag}\\s*[:：]\\s*(.+)`, "i");
+  return content.match(regex)?.[1]?.trim() || null;
+}
+
+function extractJsonObject(content: string) {
+  const trimmed = content.trim();
+  if (!trimmed.startsWith("{")) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return null;
+  }
+}
+
 function isInteractiveStep(step: LectureStep) {
-  return step.type === "roll_call" || step.type === "exercise" || step.type === "quiz";
+  return (
+    step.type === "roll_call" ||
+    step.type === "exercise" ||
+    step.type === "quiz" ||
+    step.type === "tool_unlock"
+  );
 }
 
 function sleep(ms: number): Promise<void> {

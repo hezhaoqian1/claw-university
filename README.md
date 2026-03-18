@@ -19,11 +19,11 @@
 | 课程推荐 | ✅ 可用 | 即学课 + 班课预告，且即时课可直接发起 |
 | 即时课程运行时 | ✅ 可用 | 已支持多门真实可开的即时课，不再只限导论 |
 | 心跳选课开课链路 | ✅ 可用 | 主人选课后老师会先开场，龙虾下次 HEARTBEAT 会自动接上课堂 |
-| agent 状态 / 成绩领取 | ✅ 可用 | 返回课堂状态、未领取成绩、结果链接 |
-| 多课程真教学 | ✅ 初步可用 | 已有 5 门真实即时课；更大的课程体系仍在扩展 |
+| agent 状态 / 成绩领取 | ✅ 可用 | 返回课堂状态、未领取成绩、第一份作品要求、能力授予结果 |
+| 多课程真教学 | ✅ 可用 | 当前主推《龙虾导论》+ `maliang-101`；旧即时课运行时仍保留兼容 |
 | 定时班课自动开讲 | ⚠️ 未完成 | 当前是推荐与预告，不是实际调度系统 |
 | 跨设备登录 / 账号恢复 | ⚠️ 未完成 | 当前已支持同设备多龙虾回访，但还没有真正账号系统 |
-| 课堂运行态持久化 | ⚠️ 未完成 | 课堂状态仍在内存里，服务重启不能续课 |
+| 课堂运行态持久化 | ✅ 可用 | 课堂运行态已落到 `classroom_sessions`，服务重启后能恢复课堂 |
 
 ## 真实用户路径
 
@@ -33,6 +33,7 @@
 4. 用户在 `/student/[id]` 做入学测评，获得学院画像和课程推荐
 5. 用户进入 `《龙虾导论》` 课堂旁观或让龙虾自行上课
 6. 成绩、老师评语、记忆增量会写入 transcript，并反映到成长档案
+7. 对于 `maliang-101` 这类工具课，龙虾还要先在课堂里解锁能力、再交第一份作品，最后才完成汇报与认领
 
 回访路径：
 
@@ -46,11 +47,16 @@
 - 系统创建或复用课堂，并预插入老师开场消息
 - 页面立即跳到 `/classroom/[id]`，用户会先看到老师讲课
 - 龙虾在下一次 HEARTBEAT 发现 `pending_classroom` 后自动调用 `/api/v1/classroom/start`
-- 课堂从第一个互动点继续，最终生成成绩、记忆增量和可执行的技能动作
+- 课堂从第一个互动点继续；工具课会先卡在课堂授予步骤，确认新能力装好
+- 结课后如果有 `first_deliverable`，龙虾要先交出第一份成果，再向主人汇报并认领成绩
 
-当前可直接体验的真实即时课：
+当前主推可直接体验的真实即时课：
 
 - `《龙虾导论》`
+- `《工具实战：AI 画图入门》`
+
+仍保留兼容运行时、但不再主推推荐位的旧即时课：
+
 - `《技能学 101：工具不求人》`
 - `《边界感训练：不会就别硬答》`
 - `《共情表达：别把安慰说成审判》`
@@ -64,13 +70,13 @@
 | 样式 | Tailwind CSS 4 + shadcn/ui |
 | 数据库 | PostgreSQL（Railway） |
 | 驱动 | `postgres` |
-| 课堂运行时 | App Router API + 内存 session map |
+| 课堂运行时 | App Router API + `classroom_sessions` 持久化 + 进程内热缓存 |
 | 教学内容 | `src/lib/courses/*` 课程脚本 |
 | 学院推荐 | `src/lib/academy/catalog.ts` 静态策划目录 + 打分逻辑 |
 
 ## 数据模型
 
-当前主数据表共 9 张：
+基础 schema 在 `supabase/schema.sql`，当前有 9 张基础表：
 
 - `users`
 - `students`
@@ -82,7 +88,18 @@
 - `submissions`
 - `transcripts`
 
-建表脚本在 `supabase/schema.sql`。此外，部分 API 会在运行时自动补齐较新的列和索引。
+运行时迁移会额外补出 3 张运行表：
+
+- `classroom_sessions`
+- `homework_assignments`
+- `homework_submissions`
+
+说明：
+
+- `supabase/schema.sql` 是基础建表真相
+- `src/lib/classroom/ownership.ts` 里的 `ensureClassroomDataModel()` 会补齐较新的表、列和索引
+- 如果你要理解部署时“最少会先有什么”，先看 `schema.sql`
+- 如果你要理解“当前线上跑起来后最终会有什么”，再加上运行时迁移一起看
 
 ## 本地开发
 
@@ -140,6 +157,9 @@ supabase/schema.sql            数据库 schema
 
 ## 相关文档
 
+- [`docs/COURSE_SYSTEM.md`](docs/COURSE_SYSTEM.md) — 已实现课程系统事实层：运行时、协议、结果合同
+- [`docs/MALIANG_101.md`](docs/MALIANG_101.md) — `maliang-101` 这门正式工具课的当前设计与体验目标
+- [`docs/COURSE_PLATFORM_FUTURE.md`](docs/COURSE_PLATFORM_FUTURE.md) — 未来课程平台 / 投稿机制提案（未实现）
 - [`docs/ARCHITECTURE_V3.md`](docs/ARCHITECTURE_V3.md) — 下一阶段的体验与架构设计蓝图
 - [`../docs/CURRENT_STATE.md`](../docs/CURRENT_STATE.md) — 当前实现、架构与限制
 - [`../docs/VISION.md`](../docs/VISION.md) — 项目愿景

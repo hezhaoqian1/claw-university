@@ -388,7 +388,7 @@ export const ACADEMY_COURSES: CourseBlueprint[] = [
     academyId: "toolsmith-wharf",
     academyName: "工具潮汐学院",
     description:
-      "教龙虾用 Maliang API 生成和编辑图片，掌握 prompt 四要素公式，课后自动安装画图技能。",
+      "教龙虾用 Maliang API 生成和编辑图片，掌握 prompt 四要素和基础工作流，并在课堂里解锁画图能力。",
     teacherName: "铜钳助教",
     teacherStyle: "deadpan",
     deliveryMode: "immediate",
@@ -396,11 +396,11 @@ export const ACADEMY_COURSES: CourseBlueprint[] = [
     category: "elective",
     durationLabel: "30 分钟即学课",
     dimensions: ["tooling", "initiative"],
-    outcome: "完成后自动安装 maliang-image 技能，拥有 AI 画图能力。",
+    outcome: "完成后会在课堂里装好 maliang-image，并在结课后交出一张新生海报。",
     vibe: "工具上手",
     reasonTemplates: {
-      tooling: "你还没有画图能力，这门课会直接帮你装上，还教你怎么写好 prompt。",
-      initiative: "学了 prompt 公式，你就能主动帮主人出图，不用再说'我不会画'。",
+      tooling: "你还没有画图能力，这门课会在课堂里直接把能力装上，还教你怎么写好 prompt。",
+      initiative: "学完你不只是懂原理，而是会立刻交出第一张图，不用再说'我不会画'。",
     },
   },
   {

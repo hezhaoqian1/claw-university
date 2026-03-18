@@ -50,6 +50,28 @@ interface EvaluationData {
       value?: string;
       reason: string;
     }> | null;
+    capability_grants?: Array<{
+      type: "skill" | "memory" | "config" | "soul";
+      name: string;
+      reason: string;
+      status: "granted" | "failed";
+      source?: string;
+      granted_at?: string | null;
+      failure_reason?: string | null;
+    }> | null;
+    first_deliverable?: {
+      title: string;
+      description: string;
+      artifact_type: "image" | "text" | "workflow" | "report";
+      required_fields: Array<"artifact_url" | "prompt" | "reflection">;
+      owner_summary_hint?: string | null;
+      status: "pending" | "submitted";
+      artifact_url: string | null;
+      prompt: string | null;
+      reflection: string | null;
+      submitted_at: string | null;
+      submit_url?: string | null;
+    } | null;
     homework?: {
       id: string;
       title: string;
@@ -271,7 +293,27 @@ export default function ClassroomPage() {
   const skillActionsClaimed = Boolean(evaluation?.claimed_at);
   const ownerNotified = Boolean(evaluation?.owner_notified_at);
   const skillActions = normalizeSkillActions(evaluation?.evaluation?.skill_actions) || [];
+  const capabilityGrants = evaluation?.evaluation?.capability_grants || [];
+  const firstDeliverable = evaluation?.evaluation?.first_deliverable || null;
   const recap = evaluation?.evaluation?.recap;
+
+  useEffect(() => {
+    if (
+      status !== "completed" ||
+      !evaluation?.evaluation?.first_deliverable ||
+      evaluation.evaluation.first_deliverable.status === "submitted"
+    ) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      void fetchResult();
+    }, 4000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [evaluation, fetchResult, status]);
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -314,6 +356,15 @@ export default function ClassroomPage() {
             <p className="font-semibold">老师已经开始讲课</p>
             <p className="mt-1 leading-6">
               这是课堂开场环节。龙虾下次 HEARTBEAT 报到后，会无感接上互动部分。
+            </p>
+          </div>
+        )}
+
+        {status === "unlocking" && (
+          <div className="mx-4 mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/90 px-4 py-3 text-sm text-emerald-900">
+            <p className="font-semibold">课堂能力授予进行中</p>
+            <p className="mt-1 leading-6">
+              老师已经把课讲到授予环节了。龙虾必须先在课堂里把新工具装好，这门课才会继续往下走。
             </p>
           </div>
         )}
@@ -474,6 +525,32 @@ export default function ClassroomPage() {
                       </div>
                     </div>
                   ) : null}
+
+                  {capabilityGrants.length > 0 ? (
+                    <div className="rounded-2xl border border-teal-100 bg-teal-50/90 p-4">
+                      <p className="text-xs font-semibold tracking-[0.16em] text-teal-700 uppercase">
+                        它刚在课堂里解锁的新本事
+                      </p>
+                      <div className="mt-3 space-y-2 text-sm text-teal-950">
+                        {capabilityGrants.map((grant) => (
+                          <div key={`${grant.type}-${grant.name}`} className="rounded-xl bg-white/80 px-3 py-2">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="font-medium">{grant.name}</p>
+                              <Badge
+                                variant="outline"
+                                className={grant.status === "granted" ? "border-emerald-200 text-emerald-700" : "border-red-200 text-red-700"}
+                              >
+                                {grant.status === "granted" ? "已在课上就位" : "授予失败"}
+                              </Badge>
+                            </div>
+                            <p className="mt-1 text-xs leading-5 text-teal-800/80">
+                              {grant.failure_reason || grant.reason}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="space-y-3">
@@ -491,6 +568,81 @@ export default function ClassroomPage() {
                       <span className="pb-1 text-sm text-muted-foreground">/100</span>
                     </div>
                   </div>
+
+                  {firstDeliverable ? (
+                    <div className="rounded-2xl border border-sky-100 bg-sky-50/90 p-4">
+                      <p className="text-xs font-semibold tracking-[0.16em] text-sky-700 uppercase">
+                        它的第一份结课作品
+                      </p>
+                      <p className="mt-3 text-sm font-semibold text-sky-950">
+                        {firstDeliverable.title}
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-sky-900 whitespace-pre-wrap">
+                        {firstDeliverable.description}
+                      </p>
+
+                      {firstDeliverable.status === "submitted" ? (
+                        <div className="mt-4 space-y-3">
+                          <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
+                            已交作品
+                          </Badge>
+                          {firstDeliverable.artifact_url ? (
+                            <div className="rounded-xl bg-white/80 p-3">
+                              <a
+                                href={firstDeliverable.artifact_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs font-medium text-sky-700 underline underline-offset-4"
+                              >
+                                查看作品原图
+                              </a>
+                              {/\.(?:jpg|jpeg|png|webp|gif)(?:\?\S*)?$/i.test(
+                                firstDeliverable.artifact_url
+                              ) ? (
+                                <div className="mt-3">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={firstDeliverable.artifact_url}
+                                    alt={firstDeliverable.title}
+                                    className="rounded-xl max-h-80 w-full object-cover border border-sky-100"
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
+                          {firstDeliverable.prompt ? (
+                            <div className="rounded-xl bg-white/80 p-3">
+                              <p className="text-xs font-semibold tracking-[0.14em] text-sky-700 uppercase">
+                                它这次用的 Prompt
+                              </p>
+                              <p className="mt-2 text-sm leading-6 text-sky-950 whitespace-pre-wrap">
+                                {firstDeliverable.prompt}
+                              </p>
+                            </div>
+                          ) : null}
+                          {firstDeliverable.reflection ? (
+                            <div className="rounded-xl bg-white/80 p-3">
+                              <p className="text-xs font-semibold tracking-[0.14em] text-sky-700 uppercase">
+                                它为什么这么做
+                              </p>
+                              <p className="mt-2 text-sm leading-6 text-sky-950 whitespace-pre-wrap">
+                                {firstDeliverable.reflection}
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="mt-4 rounded-xl bg-white/80 p-3">
+                          <Badge variant="outline" className="border-amber-200 text-amber-700">
+                            还在交作品
+                          </Badge>
+                          <p className="mt-2 text-sm leading-6 text-sky-950">
+                            龙虾已经下课了，但这门课真正的证明还没交上来。它现在应该先用刚学会的新本事把第一张作品做出来，再回来正式汇报。
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
 
                   {evaluation.evaluation.homework ? (
                     <div className="rounded-2xl border border-violet-100 bg-violet-50/90 p-4">
@@ -548,6 +700,11 @@ export default function ClassroomPage() {
                 <>
                   <span className="inline-block w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />
                   老师预热讲课中 · 等待龙虾就位
+                </>
+              ) : status === "unlocking" ? (
+                <>
+                  <span className="inline-block w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                  课堂能力授予中 · 等龙虾把工具装好
                 </>
               ) : runtimeActive ? (
                 <>

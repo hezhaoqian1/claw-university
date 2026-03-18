@@ -73,7 +73,8 @@ export async function GET(
         : mapClassroomStatus(
             classrooms[0].status as "scheduled" | "in_progress" | "completed"
           ));
-    const waitingForResponse = classroomStatus === "waiting_response";
+    const waitingForResponse =
+      classroomStatus === "waiting_response" || classroomStatus === "unlocking";
 
     let promptHint: string | null = null;
     if (waitingForResponse && session?.pendingExercise) {
@@ -81,6 +82,11 @@ export async function GET(
       if (step.type === "roll_call") promptHint = "请回答「到」";
       else if (step.type === "exercise") promptHint = step.exercise_prompt || step.content;
       else if (step.type === "quiz") promptHint = step.content;
+      else if (step.type === "tool_unlock") {
+        promptHint =
+          step.unlock_prompt ||
+          "现在在课堂里安装老师授予的技能。成功就按 UNLOCK_STATUS / UNLOCKED_SKILL / INSTALL_NOTE 回复；失败就按 UNLOCK_STATUS / ERROR 回复。";
+      }
     }
 
     return NextResponse.json({

@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { getBaseUrl } from "@/lib/app-url";
 import { ensureClassroomDataModel } from "@/lib/classroom/ownership";
+import {
+  normalizeCapabilityGrants,
+  normalizeFirstDeliverable,
+} from "@/lib/course-results";
 import { isLiveCourseName, isRetiredLiveCourseName } from "@/lib/courses/registry";
 import { buildOwnerRecapMessage, buildPostClassRecap } from "@/lib/post-class-recap";
 import { SKILL_VERSION } from "@/lib/skill-files";
@@ -99,6 +103,8 @@ export async function GET(req: NextRequest) {
         t.memory_delta,
         t.soul_suggestion,
         t.skill_actions,
+        t.capability_grants,
+        t.first_deliverable,
         t.owner_notified_at,
         co.name as course_name
       FROM transcripts t
@@ -157,6 +163,8 @@ export async function GET(req: NextRequest) {
       })),
       new_results: newResults.map((r) => {
         const skillActions = normalizeSkillActions(r.skill_actions);
+        const capabilityGrants = normalizeCapabilityGrants(r.capability_grants);
+        const firstDeliverable = normalizeFirstDeliverable(r.first_deliverable);
         const homework = r.classroom_id
           ? homeworkByClassroomId.get(r.classroom_id as string) || null
           : null;
@@ -166,6 +174,8 @@ export async function GET(req: NextRequest) {
           memoryDelta: r.memory_delta as string | null,
           soulSuggestion: r.soul_suggestion as string | null,
           skillActions,
+          capabilityGrants,
+          firstDeliverable,
           homework,
         });
         const resultUrl = r.classroom_id
@@ -185,6 +195,10 @@ export async function GET(req: NextRequest) {
           url.searchParams.set("notify", "1");
           return url.toString();
         })() : null;
+        const deliverableSubmitUrl =
+          r.classroom_id
+            ? `${baseUrl}/api/v1/classroom/${r.classroom_id}/deliverable`
+            : null;
 
         return {
           classroom_id: r.classroom_id,
@@ -195,6 +209,13 @@ export async function GET(req: NextRequest) {
           memory_delta: r.memory_delta,
           soul_suggestion: r.soul_suggestion,
           skill_actions: skillActions,
+          capability_grants: capabilityGrants,
+          first_deliverable: firstDeliverable
+            ? {
+                ...firstDeliverable,
+                submit_url: deliverableSubmitUrl,
+              }
+            : null,
           owner_notified_at: r.owner_notified_at,
           owner_update_required: !r.owner_notified_at,
           recap,
@@ -203,6 +224,7 @@ export async function GET(req: NextRequest) {
             grade: r.grade as string,
             score: Number(r.final_score),
             recap,
+            firstDeliverable,
           }),
           result_url: resultUrl,
           notify_url: notifyUrl,

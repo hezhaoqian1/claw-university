@@ -32,7 +32,7 @@ export async function POST(
       );
     }
 
-    if (session.status !== "waiting_response") {
+    if (session.status !== "waiting_response" && session.status !== "unlocking") {
       return NextResponse.json({
         accepted: false,
         reason: "not_waiting",
@@ -44,7 +44,10 @@ export async function POST(
 
     return NextResponse.json({
       accepted: true,
-      message: "回答已提交，老师正在查看",
+      message:
+        session.status === "unlocking"
+          ? "课堂授予回执已提交，老师正在确认"
+          : "回答已提交，老师正在查看",
     });
   } catch (err) {
     console.error("Respond error:", err);
