@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { submitHomework } from "@/lib/homework";
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export async function POST(req: NextRequest) {
   try {
     const { assignment_id, student_id, content, attachments } = await req.json();
@@ -13,6 +16,13 @@ export async function POST(req: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "Missing assignment_id, student_id, or content" },
+        { status: 400 }
+      );
+    }
+
+    if (!UUID_PATTERN.test(assignment_id) || !UUID_PATTERN.test(student_id)) {
+      return NextResponse.json(
+        { error: "Invalid assignment_id or student_id format" },
         { status: 400 }
       );
     }

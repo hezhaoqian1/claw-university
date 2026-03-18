@@ -89,7 +89,7 @@ create table if not exists classroom_messages (
   agent_name text not null,
   role text not null check (role in ('teacher', 'student', 'system')),
   content text not null,
-  message_type text not null check (message_type in ('lecture', 'question', 'answer', 'exercise', 'feedback', 'roll_call', 'summary')),
+  message_type text not null check (message_type in ('lecture', 'question', 'answer', 'exercise', 'feedback', 'roll_call', 'summary', 'unlock')),
   delay_ms integer not null default 0,
   created_at timestamptz default now() not null
 );

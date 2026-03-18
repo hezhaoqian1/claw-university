@@ -47,6 +47,28 @@ export async function ensureClassroomDataModel(): Promise<void> {
       `;
 
       await sql`
+        ALTER TABLE classroom_messages
+        DROP CONSTRAINT IF EXISTS classroom_messages_message_type_check
+      `;
+
+      await sql`
+        ALTER TABLE classroom_messages
+        ADD CONSTRAINT classroom_messages_message_type_check
+        CHECK (
+          message_type IN (
+            'lecture',
+            'question',
+            'answer',
+            'exercise',
+            'feedback',
+            'roll_call',
+            'summary',
+            'unlock'
+          )
+        )
+      `;
+
+      await sql`
         ALTER TABLE transcripts
         ADD COLUMN IF NOT EXISTS classroom_id uuid REFERENCES classrooms(id)
       `;
@@ -140,6 +162,55 @@ export async function ensureClassroomDataModel(): Promise<void> {
       `;
 
       await sql`
+        ALTER TABLE homework_assignments
+        ADD COLUMN IF NOT EXISTS submitted_at timestamptz
+      `;
+
+      await sql`
+        ALTER TABLE homework_assignments
+        ADD COLUMN IF NOT EXISTS reviewed_at timestamptz
+      `;
+
+      await sql`
+        ALTER TABLE homework_assignments
+        ADD COLUMN IF NOT EXISTS created_at timestamptz
+      `;
+
+      await sql`
+        ALTER TABLE homework_assignments
+        ADD COLUMN IF NOT EXISTS updated_at timestamptz
+      `;
+
+      await sql`
+        UPDATE homework_assignments
+        SET
+          created_at = COALESCE(created_at, now()),
+          updated_at = COALESCE(updated_at, now())
+        WHERE created_at IS NULL
+           OR updated_at IS NULL
+      `;
+
+      await sql`
+        ALTER TABLE homework_assignments
+        ALTER COLUMN created_at SET DEFAULT now()
+      `;
+
+      await sql`
+        ALTER TABLE homework_assignments
+        ALTER COLUMN updated_at SET DEFAULT now()
+      `;
+
+      await sql`
+        ALTER TABLE homework_assignments
+        ALTER COLUMN created_at SET NOT NULL
+      `;
+
+      await sql`
+        ALTER TABLE homework_assignments
+        ALTER COLUMN updated_at SET NOT NULL
+      `;
+
+      await sql`
         CREATE INDEX IF NOT EXISTS idx_homework_assignments_student
         ON homework_assignments(student_id, status, due_at ASC)
       `;
@@ -153,6 +224,32 @@ export async function ensureClassroomDataModel(): Promise<void> {
           attachments jsonb NOT NULL DEFAULT '[]'::jsonb,
           submitted_at timestamptz DEFAULT now() NOT NULL
         )
+      `;
+
+      await sql`
+        ALTER TABLE homework_submissions
+        ADD COLUMN IF NOT EXISTS attachments jsonb NOT NULL DEFAULT '[]'::jsonb
+      `;
+
+      await sql`
+        ALTER TABLE homework_submissions
+        ADD COLUMN IF NOT EXISTS submitted_at timestamptz
+      `;
+
+      await sql`
+        UPDATE homework_submissions
+        SET submitted_at = COALESCE(submitted_at, now())
+        WHERE submitted_at IS NULL
+      `;
+
+      await sql`
+        ALTER TABLE homework_submissions
+        ALTER COLUMN submitted_at SET DEFAULT now()
+      `;
+
+      await sql`
+        ALTER TABLE homework_submissions
+        ALTER COLUMN submitted_at SET NOT NULL
       `;
 
       await sql`
