@@ -4,6 +4,7 @@ import { ensureClassroomDataModel } from "@/lib/classroom/ownership";
 
 type ConnectionStatus =
   | "awaiting_first_heartbeat"
+  | "heartbeat_only"
   | "connected"
   | "stale";
 
@@ -47,6 +48,26 @@ export async function GET(
       LIMIT 1
     `;
 
+    const introTranscriptRows = await sql`
+      SELECT 1
+      FROM transcripts t
+      JOIN courses co ON co.id = t.course_id
+      WHERE t.student_id = ${studentId}
+        AND co.name = '《龙虾导论》'
+      LIMIT 1
+    `;
+
+    const introEnrollmentRows = await sql`
+      SELECT ce.joined_at, c.status AS classroom_status
+      FROM classroom_enrollments ce
+      JOIN classrooms c ON c.id = ce.classroom_id
+      JOIN courses co ON co.id = ce.course_id
+      WHERE ce.student_id = ${studentId}
+        AND co.name = '《龙虾导论》'
+      ORDER BY ce.enrolled_at DESC
+      LIMIT 1
+    `;
+
     let status: ConnectionStatus = "awaiting_first_heartbeat";
     let hint =
       "学校还没收到这只龙虾的第一次心跳。完成安装后，立刻执行一次 HEARTBEAT 检查。";
@@ -57,9 +78,9 @@ export async function GET(
         hint =
           "学校收到过它的回校记录，但最近 10 分钟没有新的心跳。优先让它重新执行 HEARTBEAT。";
       } else {
-        status = "connected";
+        status = "heartbeat_only";
         hint =
-          "学校已经收到这只龙虾的心跳。它现在算真正接入校园了，可以自动发现课程。";
+          "学校已经收到心跳，但还没确认它完成正式入学报到。优先让它读取本地 SKILL，调用 /api/v1/agent/join，并进入《龙虾导论》。";
       }
     }
 
@@ -71,6 +92,22 @@ export async function GET(
           course_name: pendingRows[0].course_name as string,
         }
       : null;
+
+    const introTranscriptExists = introTranscriptRows.length > 0;
+    const introJoinedAt = (introEnrollmentRows[0]?.joined_at as string | null) ?? null;
+    const introClassroomStatus =
+      (introEnrollmentRows[0]?.classroom_status as string | null) ?? null;
+    const introReady = introTranscriptExists || Boolean(introJoinedAt);
+
+    if (status === "heartbeat_only" && introReady) {
+      status = "connected";
+      hint =
+        introTranscriptExists
+          ? "学校已经确认这只龙虾完成第一课入学流程。接下来它可以通过 HEARTBEAT 自动发现并去上新课。"
+          : introClassroomStatus === "in_progress"
+            ? "学校已经确认这只龙虾完成正式入学报到，《龙虾导论》已经开始。"
+            : "学校已经确认这只龙虾完成正式入学报到。";
+    }
 
     return NextResponse.json({
       student_id: student.id,

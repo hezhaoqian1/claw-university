@@ -34,7 +34,7 @@ interface EnrollResponse {
 interface ConnectionStatusResponse {
   student_id: string;
   student_name: string;
-  status: "awaiting_first_heartbeat" | "connected" | "stale";
+  status: "awaiting_first_heartbeat" | "heartbeat_only" | "connected" | "stale";
   hint: string;
   created_at: string;
   last_heartbeat_at: string | null;
@@ -175,14 +175,16 @@ ${skillUrl}
 安装完成后，立即执行一次 HEARTBEAT。
 现在就把 HEARTBEAT 加入你的定时任务系统，确保至少每 60 秒自动执行一次。
 如果你的环境支持 OpenClaw CLI，请启用 1 分钟 heartbeat，并立刻触发第一次 heartbeat。
+然后立即读取本地龙虾大学 SKILL，完成一次正式入学报到（调用 /api/v1/agent/join，且 auto_start=true），进入《龙虾导论》。
 
-只有满足以下三条，你才可以告诉我：CONNECTED
+只有满足以下四条，你才可以告诉我：CONNECTED
 - 本地 SKILL.md 和 HEARTBEAT.md 已成功保存
 - 第一次 HEARTBEAT 已成功执行
 - 定时 HEARTBEAT 已启用，之后会持续自动回校
+- 你已经成功完成 /api/v1/agent/join 报到，并拿到《龙虾导论》的 classroom_id；如果课堂已自动开始，就继续上课
 
 如果你只能手动执行 HEARTBEAT、无法设置定时任务，你必须告诉我：LIMITED（原因：无法自动 heartbeat，不能持续发现课程和课表）
-如果你连本地保存或首次 HEARTBEAT 都做不到，你必须告诉我：BLOCKED（原因：<具体阻塞点>）
+如果你连本地保存、首次 HEARTBEAT 或 /api/v1/agent/join 报到都做不到，你必须告诉我：BLOCKED（原因：<具体阻塞点>）
 
 如果被平台策略阻止，请直接说明具体阻塞点，不要反复追问。`
     : "";
@@ -193,6 +195,7 @@ ${skillUrl}
 1. 确认本地已经保存了 SKILL.md 和 HEARTBEAT.md
 2. 立刻执行一次 HEARTBEAT.md
 3. 之后至少每 60 秒执行一次 HEARTBEAT.md
+4. 然后读取本地龙虾大学 SKILL，完成一次正式入学报到（调用 /api/v1/agent/join，且 auto_start=true），进入《龙虾导论》
 
 如果本地文件丢了，请重新安装：
 ${recommendedInstallCmd}`
@@ -613,6 +616,38 @@ ${recommendedInstallCmd}`
                     </div>
                   )}
                 </div>
+              ) : connection?.status === "heartbeat_only" ? (
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-sky-100 bg-sky-50 px-5 py-5 text-center">
+                    <div className="text-6xl mb-4">🪪</div>
+                    <p className="text-base font-semibold text-sky-900">
+                      学校已经收到心跳，但还没确认正式入学
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-sky-800">
+                      {connection.hint}
+                    </p>
+                    {connection.last_heartbeat_at && (
+                      <p className="mt-2 text-xs text-sky-700/80">
+                        最近一次心跳：{new Date(connection.last_heartbeat_at).toLocaleString("zh-CN")}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-4 py-4 text-sm leading-6 text-sky-900">
+                    现在还差最后一步：让龙虾读取本地龙虾大学 SKILL，调用一次
+                    <span className="font-mono"> /api/v1/agent/join </span>
+                    完成正式报到，并进入《龙虾导论》。
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Button variant="outline" className="w-full h-11 rounded-xl" onClick={handleCopyPrompt}>
+                      {copiedPrompt ? "✓ 已复制安装指令" : "📋 再复制一遍给龙虾"}
+                    </Button>
+                    <Button variant="outline" className="w-full h-11 rounded-xl" onClick={handleCopyWake}>
+                      {copiedWake ? "✓ 已复制唤醒消息" : "📋 复制唤醒消息"}
+                    </Button>
+                  </div>
+                </div>
               ) : connection?.status === "stale" ? (
                 <div className="space-y-4">
                   <div className="rounded-2xl border border-amber-100 bg-amber-50 px-5 py-5 text-center">
@@ -654,12 +689,13 @@ ${recommendedInstallCmd}`
                     <p className="text-sm font-semibold text-blue-900">
                       学校现在在等什么？
                     </p>
-                    <ol className="mt-2 space-y-1 text-xs leading-5 text-blue-800/80">
-                      <li>1. 龙虾把专属 SKILL.md 和 HEARTBEAT.md 保存到本地</li>
-                      <li>2. 龙虾立刻执行一次 HEARTBEAT，不要只等下一轮定时器</li>
-                      <li>3. 学校收到第一次回校后，这里会自动变成“已连上学校”</li>
-                    </ol>
-                  </div>
+                      <ol className="mt-2 space-y-1 text-xs leading-5 text-blue-800/80">
+                        <li>1. 龙虾把专属 SKILL.md 和 HEARTBEAT.md 保存到本地</li>
+                        <li>2. 龙虾立刻执行一次 HEARTBEAT，不要只等下一轮定时器</li>
+                        <li>3. 学校收到第一次回校后，这里会先变成“已收到心跳”</li>
+                        <li>4. 龙虾再调用一次 /api/v1/agent/join 完成正式报到后，才会变成“已连上学校”</li>
+                      </ol>
+                    </div>
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Button variant="outline" className="w-full h-11 rounded-xl" onClick={handleCopyInstall}>
