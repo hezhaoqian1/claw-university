@@ -132,6 +132,12 @@ bootstrap 只做一件事：
 
 如果 partner 支持多种登录方式（钱包、邮箱、Privy、Telegram 等），请先在 partner 自己的身份系统里归并，再把归并后的稳定用户 ID 传给 `external_user_id`。不要让学校后端去理解你们的登录方式细节。
 
+这个接口还会返回：
+
+- `dashboard_url`
+
+partner 前端后续如果想直接拉这只龙虾的完整培养总览，不用自己再拼学校内部 student UUID。
+
 ### 4.3 让龙虾接校
 
 partner 创建学生后，不需要自己拼安装文案。
@@ -187,7 +193,26 @@ partner 创建学生后，不需要自己拼安装文案。
 - 完成正式 join / 导论入学证据后，才算 `connected`
 - 超过 10 分钟没新 heartbeat，会变 `stale`
 
-### 4.5 看学生课程目录
+### 4.5 读学生总览
+
+调用：
+
+- `GET /api/partner/v1/students/{partnerStudentId}/dashboard`
+
+这个接口是 partner 前端最适合做“学生主页 / 学习档案”用的 facade。
+
+它会返回：
+
+- 学生基础信息
+- 连接与 heartbeat 相关摘要
+- 当前 pending classroom / pending homework
+- 最新结课 recap
+- transcripts 历史
+- 推荐课程卡片（已改写成 partner-safe classroom URL）
+
+partner 不需要自己去拼学校内部 dashboard 结构，也不需要知道学校内部 `student_id`。
+
+### 4.6 看学生课程目录
 
 如果 partner 前端想知道：
 
@@ -209,7 +234,7 @@ partner 创建学生后，不需要自己拼安装文案。
 
 它本质上是 partner facade 版的课程目录，不需要 partner 再去理解学校内部 `student_id`。
 
-### 4.6 给学生报课
+### 4.7 给学生报课
 
 调用：
 
@@ -221,7 +246,7 @@ partner 创建学生后，不需要自己拼安装文案。
 - 不会强制 agent 立刻入场
 - agent 还是通过 HEARTBEAT 自己发现 `pending_classroom` 然后开课
 
-### 4.7 读课堂状态和消息
+### 4.8 读课堂状态和消息
 
 状态卡调用：
 
@@ -237,7 +262,13 @@ partner 创建学生后，不需要自己拼安装文案。
 
 否则 partner route 会返回 `400`，要求显式选定是哪一只学生。
 
-### 4.8 读事件流
+注意：
+
+- 这里返回的是 **partner facade 的读模型**
+- `actions.classroom_url` / `actions.messages_url` 已改成 partner-safe URL
+- agent 自己用的 `/api/v1/classroom/start`、`/respond` 这类写接口，不属于 partner 前端合同
+
+### 4.9 读事件流
 
 调用：
 
@@ -278,10 +309,12 @@ partner 创建学生后，不需要自己拼安装文案。
 
 - `GET /api/partner/v1/students/{partnerStudentId}/install-bundle`
 - `GET /api/partner/v1/students/{partnerStudentId}/connection`
+- `GET /api/partner/v1/students/{partnerStudentId}/dashboard`
 
 用途：
 
 - 让 partner 前端完成“装 skill -> 等 heartbeat -> 等 join -> 连校成功”
+- 让 partner 前端直接拿到完整的学生总览与培养档案
 
 ### 5.4 课程与课堂
 
@@ -322,6 +355,12 @@ partner 创建学生后，不需要自己拼安装文案。
 ## 7. 和官方 `/api/v1/*` 的关系
 
 partner v1 不是替换 `/api/v1/*`，而是把对外更稳定的部分先包出来。
+
+对 partner 前端/BFF 的原则是：
+
+- facade 返回 partner 自己能直接消费的 read model
+- partner 不应该再依赖学校内部 `student_id`
+- agent runtime 仍然继续走官方 `/api/v1/*` 协议
 
 当前仍然保留两类学校 canonical route：
 

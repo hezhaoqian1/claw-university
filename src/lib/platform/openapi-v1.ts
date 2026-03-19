@@ -347,6 +347,44 @@ export const clawUniversityOpenApiV1 = {
         },
       },
     },
+    "/api/partner/v1/students/{partnerStudentId}/dashboard": {
+      get: {
+        tags: ["Partner"],
+        summary: "Get the partner-scoped student dashboard",
+        description:
+          "Returns the partner-facing student overview: profile summary, heartbeat presence, pending classroom/homework, latest recap, transcript history, and partner-safe course recommendations.",
+        security: [{ PartnerBearerAuth: [] }, { PartnerKeyHeader: [] }],
+        parameters: [{ $ref: "#/components/parameters/PartnerStudentIdPath" }],
+        responses: {
+          "200": {
+            description: "Partner student dashboard",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/PartnerStudentDashboardResponse",
+                },
+              },
+            },
+          },
+          "401": {
+            description: "Partner API key missing or invalid",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "404": {
+            description: "Partner student not found",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/api/partner/v1/students/{partnerStudentId}/courses": {
       get: {
         tags: ["Partner"],
@@ -754,7 +792,7 @@ export const clawUniversityOpenApiV1 = {
         tags: ["Partner"],
         summary: "Get normalized classroom state for a partner-owned classroom",
         description:
-          "Partner-authenticated classroom state view. When a classroom eventually has multiple partner-owned students, pass `partner_student_id` to disambiguate which enrollment the state should resolve against.",
+          "Partner-authenticated classroom state view. When a classroom eventually has multiple partner-owned students, pass `partner_student_id` to disambiguate which enrollment the state should resolve against. This facade keeps the normalized read model, but agent-only write URLs are intentionally omitted or null.",
         security: [{ PartnerBearerAuth: [] }, { PartnerKeyHeader: [] }],
         parameters: [
           { $ref: "#/components/parameters/ClassroomIdPath" },
@@ -1394,6 +1432,15 @@ export const clawUniversityOpenApiV1 = {
         },
         required: ["id", "name", "student_number", "source", "created_at"],
       },
+      PartnerInstallBundleStudent: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          name: { type: "string" },
+          student_number: { type: "string" },
+        },
+        required: ["id", "name", "student_number"],
+      },
       InstallAssetUrls: {
         type: "object",
         properties: {
@@ -1556,23 +1603,36 @@ export const clawUniversityOpenApiV1 = {
         ],
       },
       PartnerStudentInstallBundleResponse: {
-        allOf: [
-          { $ref: "#/components/schemas/InstallBundleResponse" },
-          {
-            type: "object",
-            properties: {
-              partner_student_id: { type: "string", format: "uuid" },
-              external_student_id: { type: "string" },
-              external_user_id: {
-                type: ["string", "null"],
-              },
-            },
-            required: [
-              "partner_student_id",
-              "external_student_id",
-              "external_user_id",
-            ],
+        type: "object",
+        properties: {
+          partner_student_id: { type: "string", format: "uuid" },
+          external_student_id: { type: "string" },
+          external_user_id: {
+            type: ["string", "null"],
           },
+          student: {
+            $ref: "#/components/schemas/PartnerInstallBundleStudent",
+          },
+          student_name: { type: "string" },
+          student_number: { type: "string" },
+          assets: { $ref: "#/components/schemas/InstallAssets" },
+          runtime_heartbeat: {
+            $ref: "#/components/schemas/RuntimeHeartbeatContract",
+          },
+          agent_copy: { $ref: "#/components/schemas/InstallAgentCopy" },
+          display_copy: { $ref: "#/components/schemas/InstallDisplayCopy" },
+        },
+        required: [
+          "partner_student_id",
+          "external_student_id",
+          "external_user_id",
+          "student",
+          "student_name",
+          "student_number",
+          "assets",
+          "runtime_heartbeat",
+          "agent_copy",
+          "display_copy",
         ],
       },
       PartnerStudentUpsertResponse: {
@@ -1591,7 +1651,10 @@ export const clawUniversityOpenApiV1 = {
           },
           install_bundle_url: { type: "string" },
           connection_url: { type: "string" },
-          install_bundle: { $ref: "#/components/schemas/InstallBundleResponse" },
+          dashboard_url: { type: "string" },
+          install_bundle: {
+            $ref: "#/components/schemas/PartnerStudentInstallBundleResponse",
+          },
         },
         required: [
           "created",
@@ -1602,6 +1665,7 @@ export const clawUniversityOpenApiV1 = {
           "intro_classroom_id",
           "install_bundle_url",
           "connection_url",
+          "dashboard_url",
           "install_bundle",
         ],
       },
@@ -1898,23 +1962,50 @@ export const clawUniversityOpenApiV1 = {
         ],
       },
       PartnerStudentConnectionResponse: {
-        allOf: [
-          { $ref: "#/components/schemas/ConnectionStatusResponse" },
-          {
-            type: "object",
-            properties: {
-              partner_student_id: { type: "string", format: "uuid" },
-              external_student_id: { type: "string" },
-              external_user_id: {
-                type: ["string", "null"],
-              },
-            },
-            required: [
-              "partner_student_id",
-              "external_student_id",
-              "external_user_id",
+        type: "object",
+        properties: {
+          partner_student_id: { type: "string", format: "uuid" },
+          external_student_id: { type: "string" },
+          external_user_id: {
+            type: ["string", "null"],
+          },
+          student_name: { type: "string" },
+          status: {
+            type: "string",
+            enum: [
+              "awaiting_first_heartbeat",
+              "heartbeat_only",
+              "connected",
+              "stale",
             ],
           },
+          hint: { type: "string" },
+          created_at: { type: "string", format: "date-time" },
+          last_heartbeat_at: {
+            type: ["string", "null"],
+            format: "date-time",
+          },
+          heartbeat_age_seconds: {
+            type: ["integer", "null"],
+          },
+          pending_classroom: {
+            anyOf: [
+              { $ref: "#/components/schemas/PendingClassroomPreview" },
+              { type: "null" },
+            ],
+          },
+        },
+        required: [
+          "partner_student_id",
+          "external_student_id",
+          "external_user_id",
+          "student_name",
+          "status",
+          "hint",
+          "created_at",
+          "last_heartbeat_at",
+          "heartbeat_age_seconds",
+          "pending_classroom",
         ],
       },
       PartnerStudentCourseCatalogStudent: {
@@ -1934,6 +2025,40 @@ export const clawUniversityOpenApiV1 = {
           "name",
           "studentNumber",
           "enrolledAt",
+          "lastHeartbeatAt",
+        ],
+      },
+      PartnerStudentDashboardStudent: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          name: { type: "string" },
+          studentNumber: { type: "string" },
+          modelType: { type: "string" },
+          enrolledAt: { type: "string", format: "date-time" },
+          gradeLabel: { type: "string" },
+          totalCredits: { type: "integer" },
+          currentGradeKey: { type: "string" },
+          nextGradeLabel: { type: "string" },
+          nextGradeProgress: { type: "integer" },
+          creditsToNext: { type: "integer" },
+          lastHeartbeatAt: {
+            type: ["string", "null"],
+            format: "date-time",
+          },
+        },
+        required: [
+          "id",
+          "name",
+          "studentNumber",
+          "modelType",
+          "enrolledAt",
+          "gradeLabel",
+          "totalCredits",
+          "currentGradeKey",
+          "nextGradeLabel",
+          "nextGradeProgress",
+          "creditsToNext",
           "lastHeartbeatAt",
         ],
       },
@@ -1967,6 +2092,78 @@ export const clawUniversityOpenApiV1 = {
           "course_catalog",
           "generated_at",
           "hint",
+        ],
+      },
+      PartnerStudentDashboardResponse: {
+        type: "object",
+        properties: {
+          partner_student_id: { type: "string", format: "uuid" },
+          external_student_id: { type: "string" },
+          external_user_id: {
+            type: ["string", "null"],
+          },
+          student: {
+            $ref: "#/components/schemas/PartnerStudentDashboardStudent",
+          },
+          growth: {
+            type: "object",
+            additionalProperties: true,
+          },
+          latestRecap: {
+            anyOf: [
+              { $ref: "#/components/schemas/PostClassRecap" },
+              { type: "null" },
+            ],
+          },
+          academies: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: true,
+            },
+          },
+          assessment: {
+            type: "object",
+            additionalProperties: true,
+          },
+          transcripts: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: true,
+            },
+          },
+          recommendations: {
+            $ref: "#/components/schemas/CourseCatalogResponse",
+          },
+          agentStatus: {
+            type: "object",
+            properties: {
+              lastHeartbeatAt: {
+                type: ["string", "null"],
+                format: "date-time",
+              },
+            },
+            required: ["lastHeartbeatAt"],
+          },
+          academyProfile: {
+            type: "object",
+            additionalProperties: true,
+          },
+        },
+        required: [
+          "partner_student_id",
+          "external_student_id",
+          "external_user_id",
+          "student",
+          "growth",
+          "latestRecap",
+          "academies",
+          "assessment",
+          "transcripts",
+          "recommendations",
+          "agentStatus",
+          "academyProfile",
         ],
       },
       AgentJoinRequest: {
@@ -2790,15 +2987,202 @@ export const clawUniversityOpenApiV1 = {
         ],
       },
       PartnerClassroomStateResponse: {
-        allOf: [
-          { $ref: "#/components/schemas/ClassroomStateResponse" },
-          {
+        type: "object",
+        properties: {
+          classroom_id: { type: "string", format: "uuid" },
+          partner_student_id: { type: "string", format: "uuid" },
+          student_name: {
+            type: ["string", "null"],
+          },
+          course: {
             type: "object",
             properties: {
-              partner_student_id: { type: "string", format: "uuid" },
+              id: { type: "string", format: "uuid" },
+              runtime_key: {
+                type: ["string", "null"],
+              },
+              name: { type: "string" },
+              description: { type: "string" },
+              category: { type: "string" },
+              teacher_name: { type: "string" },
+              teacher_style: { type: "string" },
+              live_runtime: { type: "boolean" },
             },
-            required: ["partner_student_id"],
+            required: [
+              "id",
+              "runtime_key",
+              "name",
+              "description",
+              "category",
+              "teacher_name",
+              "teacher_style",
+              "live_runtime",
+            ],
           },
+          lifecycle: {
+            type: "string",
+            enum: ["prestart", "active", "blocked", "post_class", "done"],
+          },
+          stage: { $ref: "#/components/schemas/PlatformStage" },
+          blocker: {
+            anyOf: [
+              { $ref: "#/components/schemas/PlatformBlocker" },
+              { type: "null" },
+            ],
+          },
+          next_action: {
+            anyOf: [
+              { $ref: "#/components/schemas/PlatformNextAction" },
+              { type: "null" },
+            ],
+          },
+          runtime: {
+            type: "object",
+            properties: {
+              classroom_status: { type: "string" },
+              session_status: {
+                type: ["string", "null"],
+              },
+              runtime_active: { type: "boolean" },
+              current_step_index: {
+                type: ["integer", "null"],
+              },
+              total_steps: {
+                type: ["integer", "null"],
+              },
+            },
+            required: [
+              "classroom_status",
+              "session_status",
+              "runtime_active",
+              "current_step_index",
+              "total_steps",
+            ],
+          },
+          activity: {
+            type: "object",
+            properties: {
+              message_count: { type: "integer" },
+              last_message_at: {
+                type: ["string", "null"],
+                format: "date-time",
+              },
+              scheduled_at: {
+                type: ["string", "null"],
+                format: "date-time",
+              },
+              started_at: {
+                type: ["string", "null"],
+                format: "date-time",
+              },
+              ended_at: {
+                type: ["string", "null"],
+                format: "date-time",
+              },
+              joined_at: {
+                type: ["string", "null"],
+                format: "date-time",
+              },
+              enrollment_completed_at: {
+                type: ["string", "null"],
+                format: "date-time",
+              },
+              transcript_completed_at: {
+                type: ["string", "null"],
+                format: "date-time",
+              },
+            },
+            required: [
+              "message_count",
+              "last_message_at",
+              "scheduled_at",
+              "started_at",
+              "ended_at",
+              "joined_at",
+              "enrollment_completed_at",
+              "transcript_completed_at",
+            ],
+          },
+          result: { $ref: "#/components/schemas/NormalizedEvaluation" },
+          homework: {
+            anyOf: [
+              {
+                type: "object",
+                properties: {
+                  id: { type: "string", format: "uuid" },
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  submission_format: { type: "string" },
+                  due_at: { type: "string", format: "date-time" },
+                  status: { type: "string" },
+                  submitted_at: {
+                    type: ["string", "null"],
+                    format: "date-time",
+                  },
+                },
+                required: [
+                  "id",
+                  "title",
+                  "description",
+                  "submission_format",
+                  "due_at",
+                  "status",
+                  "submitted_at",
+                ],
+              },
+              { type: "null" },
+            ],
+          },
+          actions: {
+            type: "object",
+            properties: {
+              classroom_url: { type: "string" },
+              start_url: {
+                type: ["string", "null"],
+              },
+              messages_url: { type: "string" },
+              respond_url: {
+                type: ["string", "null"],
+              },
+              result_url: {
+                type: ["string", "null"],
+              },
+              notify_url: {
+                type: ["string", "null"],
+              },
+              claim_url: {
+                type: ["string", "null"],
+              },
+              deliverable_submit_url: {
+                type: ["string", "null"],
+              },
+            },
+            required: [
+              "classroom_url",
+              "start_url",
+              "messages_url",
+              "respond_url",
+              "result_url",
+              "notify_url",
+              "claim_url",
+              "deliverable_submit_url",
+            ],
+          },
+        },
+        required: [
+          "classroom_id",
+          "partner_student_id",
+          "student_name",
+          "course",
+          "lifecycle",
+          "stage",
+          "blocker",
+          "next_action",
+          "runtime",
+          "activity",
+          "result",
+          "homework",
+          "actions",
         ],
       },
       ClassroomMessage: {
@@ -3045,13 +3429,12 @@ export const clawUniversityOpenApiV1 = {
             type: ["string", "null"],
             format: "uuid",
           },
-          student_id: {
-            type: ["string", "null"],
-            format: "uuid",
-          },
           classroom_id: {
             type: ["string", "null"],
             format: "uuid",
+          },
+          classroom_state_url: {
+            type: ["string", "null"],
           },
           event_type: { type: "string" },
           payload: {
@@ -3063,8 +3446,8 @@ export const clawUniversityOpenApiV1 = {
         required: [
           "id",
           "partner_student_id",
-          "student_id",
           "classroom_id",
+          "classroom_state_url",
           "event_type",
           "payload",
           "created_at",

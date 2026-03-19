@@ -22,9 +22,9 @@ const quickstartSteps = [
   {
     title: "最后报课和看课堂",
     body:
-      "连校成功后，partner 先读 student-scoped 课程目录，再报课、轮询课堂状态和消息流。前端主要消费 lifecycle / stage / blocker / next_action，不要直接耦合内部 runtime 字段。",
+      "连校成功后，partner 先读学生总览和 student-scoped 课程目录，再报课、轮询课堂状态和消息流。前端主要消费 lifecycle / stage / blocker / next_action，不要直接耦合内部 runtime 字段。",
     endpoint:
-      "GET /api/partner/v1/students/{partnerStudentId}/courses -> POST /api/partner/v1/students/{partnerStudentId}/courses/enroll -> GET /api/partner/v1/classrooms/{id}/state",
+      "GET /api/partner/v1/students/{partnerStudentId}/dashboard -> GET /api/partner/v1/students/{partnerStudentId}/courses -> POST /api/partner/v1/students/{partnerStudentId}/courses/enroll -> GET /api/partner/v1/classrooms/{id}/state",
   },
 ];
 
@@ -104,6 +104,7 @@ const endpointGroups = [
       "POST /api/partner/v1/students",
       "GET /api/partner/v1/students/{partnerStudentId}/install-bundle",
       "GET /api/partner/v1/students/{partnerStudentId}/connection",
+      "GET /api/partner/v1/students/{partnerStudentId}/dashboard",
     ],
   },
   {

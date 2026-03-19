@@ -3,6 +3,7 @@ import {
   buildPlatformClassroomState,
   getPlatformBaseUrl,
 } from "@/lib/platform/classroom-state";
+import { rewritePartnerClassroomState } from "@/lib/platform/partner-facade";
 import {
   authenticatePartnerRequest,
   resolvePartnerClassroomAccess,
@@ -48,10 +49,12 @@ export async function GET(
       return NextResponse.json({ error: "Classroom not found" }, { status: 404 });
     }
 
-    return NextResponse.json({
-      partner_student_id: access.partnerStudentId,
-      ...state,
-    });
+    return NextResponse.json(
+      rewritePartnerClassroomState({
+        state,
+        partnerStudentId: access.partnerStudentId,
+      })
+    );
   } catch (error) {
     console.error("Partner classroom state error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBaseUrl } from "@/lib/app-url";
-import { buildStudentInstallBundle } from "@/lib/platform/install-bundle";
-import { rewritePartnerInstallBundle } from "@/lib/platform/partner-facade";
-import {
-  authenticatePartnerRequest,
-  findPartnerStudentById,
-} from "@/lib/partners";
+import { rewritePartnerDashboard } from "@/lib/platform/partner-facade";
+import { authenticatePartnerRequest, findPartnerStudentById } from "@/lib/partners";
+import { buildStudentDashboard } from "@/lib/student/dashboard";
 
 export async function GET(
   req: NextRequest,
@@ -17,28 +13,18 @@ export async function GET(
   }
 
   const { partnerStudentId } = await params;
+
   try {
     const mapping = await findPartnerStudentById(partner.partnerId, partnerStudentId);
     if (!mapping) {
       return NextResponse.json({ error: "Partner student not found" }, { status: 404 });
     }
 
-    const bundle = buildStudentInstallBundle({
-      baseUrl: getBaseUrl(req),
-      student: {
-        id: mapping.student_id as string,
-        name: mapping.student_name as string,
-        student_number: mapping.student_number as string,
-        enrollment_token: mapping.enrollment_token as string,
-      },
-      urls: {
-        connection: `${getBaseUrl(req)}/api/partner/v1/students/${mapping.id}/connection`,
-      },
-    });
+    const dashboard = await buildStudentDashboard(mapping.student_id as string);
 
     return NextResponse.json(
-      rewritePartnerInstallBundle({
-        bundle,
+      rewritePartnerDashboard({
+        dashboard,
         mapping: {
           id: mapping.id as string,
           externalStudentId: (mapping.external_student_id as string) || null,
@@ -47,7 +33,11 @@ export async function GET(
       })
     );
   } catch (error) {
-    console.error("Partner install bundle error:", error);
+    if (error instanceof Error && error.message === "Student not found") {
+      return NextResponse.json({ error: "Student not found" }, { status: 404 });
+    }
+
+    console.error("Partner student dashboard error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

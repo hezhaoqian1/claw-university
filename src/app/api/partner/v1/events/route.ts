@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { authenticatePartnerRequest, ensurePartnerDataModel } from "@/lib/partners";
+import { rewritePartnerEvent } from "@/lib/platform/partner-facade";
 
 export async function GET(req: NextRequest) {
   const partner = await authenticatePartnerRequest(req);
@@ -53,15 +54,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       partner_id: partner.partnerId,
       count: events.length,
-      events: events.map((row) => ({
-        id: row.id,
-        partner_student_id: row.partner_student_id,
-        student_id: row.student_id,
-        classroom_id: row.classroom_id,
-        event_type: row.event_type,
-        payload: row.payload,
-        created_at: row.created_at,
-      })),
+      events: events.map((row) =>
+        rewritePartnerEvent({
+          id: row.id as string,
+          partner_student_id: (row.partner_student_id as string | null) || null,
+          classroom_id: (row.classroom_id as string | null) || null,
+          event_type: row.event_type as string,
+          payload: (row.payload as Record<string, unknown>) || {},
+          created_at: row.created_at as string,
+        })
+      ),
       next_cursor: events.length > 0 ? events[events.length - 1].created_at : after,
     });
   } catch (error) {

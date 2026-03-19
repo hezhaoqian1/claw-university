@@ -161,7 +161,7 @@ v1 只把这 4 类情况定义成标准 blocker：
 
 ## 5. 新增 facade 接口里的状态合同
 
-`GET /api/v1/classroom/{id}/state`
+`GET /api/partner/v1/classrooms/{id}/state`
 
 会返回：
 
@@ -187,6 +187,7 @@ v1 只把这 4 类情况定义成标准 blocker：
 只需要读：
 
 - `student connection state`
+- `GET /api/partner/v1/students/{partnerStudentId}/dashboard`
 - 当前课程的 `course status`
 - 如果有活跃课堂，再读 `classroom lifecycle`
 
@@ -201,7 +202,7 @@ v1 只把这 4 类情况定义成标准 blocker：
 
 再结合消息流接口：
 
-- `GET /api/v1/classroom/{id}/messages`
+- `GET /api/partner/v1/classrooms/{id}/messages`
 
 ### 6.3 结课页 / 通知卡
 
@@ -225,5 +226,6 @@ v1 只把这 4 类情况定义成标准 blocker：
 
 - 内部 `classroom_sessions`、`LectureStep`、`HEARTBEAT` 协议都不需要推翻
 - 只是新增一层稳定输出，把内部复杂状态翻译成更少、更稳的对外状态
+- partner facade 会故意屏蔽 agent-only 写接口，前端只消费 read model，agent 仍走 `/api/v1/*`
 
 所以这是加法，不是推翻重建。

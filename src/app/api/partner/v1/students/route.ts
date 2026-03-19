@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getBaseUrl } from "@/lib/app-url";
 import { buildStudentInstallBundle } from "@/lib/platform/install-bundle";
+import { rewritePartnerInstallBundle } from "@/lib/platform/partner-facade";
 import {
   appendPartnerEvent,
   authenticatePartnerRequest,
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
         external_student_id: existing.external_student_id,
         external_user_id: existing.external_user_id,
         student: {
-          id: existing.student_id,
+          id: existing.id,
           name: existing.student_name,
           student_number: existing.student_number,
           source: existing.source,
@@ -79,7 +80,15 @@ export async function POST(req: NextRequest) {
         },
         install_bundle_url: `/api/partner/v1/students/${existing.id}/install-bundle`,
         connection_url: `/api/partner/v1/students/${existing.id}/connection`,
-        install_bundle: installBundle,
+        dashboard_url: `/api/partner/v1/students/${existing.id}/dashboard`,
+        install_bundle: rewritePartnerInstallBundle({
+          bundle: installBundle,
+          mapping: {
+            id: existing.id as string,
+            externalStudentId: (existing.external_student_id as string) || null,
+            externalUserId: (existing.external_user_id as string | null) || null,
+          },
+        }),
       });
     }
 
@@ -130,7 +139,7 @@ export async function POST(req: NextRequest) {
       external_student_id: externalStudentId,
       external_user_id: externalUserId,
       student: {
-        id: created.student.id,
+        id: mapping.id,
         name: created.student.name,
         student_number: created.student.student_number,
         source: created.student.source,
@@ -139,7 +148,15 @@ export async function POST(req: NextRequest) {
       intro_classroom_id: created.classroomId,
       install_bundle_url: `/api/partner/v1/students/${mapping.id}/install-bundle`,
       connection_url: `/api/partner/v1/students/${mapping.id}/connection`,
-      install_bundle: installBundle,
+      dashboard_url: `/api/partner/v1/students/${mapping.id}/dashboard`,
+      install_bundle: rewritePartnerInstallBundle({
+        bundle: installBundle,
+        mapping: {
+          id: mapping.id,
+          externalStudentId,
+          externalUserId,
+        },
+      }),
     });
   } catch (error) {
     console.error("Partner create student error:", error);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticatePartnerRequest, findPartnerStudentById } from "@/lib/partners";
+import { rewritePartnerConnectionState } from "@/lib/platform/partner-facade";
 import { buildStudentConnectionState } from "@/lib/students/connection";
 
 export async function GET(
@@ -23,12 +24,16 @@ export async function GET(
       return NextResponse.json({ error: "Student not found" }, { status: 404 });
     }
 
-    return NextResponse.json({
-      partner_student_id: mapping.id,
-      external_student_id: mapping.external_student_id,
-      external_user_id: mapping.external_user_id,
-      ...state,
-    });
+    return NextResponse.json(
+      rewritePartnerConnectionState({
+        state,
+        mapping: {
+          id: mapping.id as string,
+          externalStudentId: (mapping.external_student_id as string) || null,
+          externalUserId: (mapping.external_user_id as string | null) || null,
+        },
+      })
+    );
   } catch (error) {
     console.error("Partner connection error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

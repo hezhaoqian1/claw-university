@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildStudentCourseCatalogView } from "@/lib/student/dashboard";
+import { rewritePartnerCourseCatalog } from "@/lib/platform/partner-facade";
 import { authenticatePartnerRequest, findPartnerStudentById } from "@/lib/partners";
 
 export async function GET(
@@ -20,40 +21,21 @@ export async function GET(
     }
 
     const view = await buildStudentCourseCatalogView(mapping.student_id as string);
-    const cards = view.recommendations.cards.map((card) => {
-      const classroomStateUrl = card.runtime.classroomId
-        ? `/api/partner/v1/classrooms/${card.runtime.classroomId}/state?partner_student_id=${mapping.id}`
-        : null;
-
-      return {
-        ...card,
-        runtime: {
-          ...card.runtime,
-          classroomUrl: classroomStateUrl,
-        },
-        action: {
-          ...card.action,
-          href: card.action.kind === "enter_classroom" ? classroomStateUrl : card.action.href,
-          payload: card.action.payload
-            ? {
-                ...card.action.payload,
-                studentId: mapping.id as string,
-              }
-            : null,
-        },
-      };
-    });
+    const courseCatalog = rewritePartnerCourseCatalog(
+      view.recommendations,
+      mapping.id as string
+    );
 
     return NextResponse.json({
       partner_student_id: mapping.id,
       external_student_id: mapping.external_student_id,
       external_user_id: mapping.external_user_id,
-      student: view.student,
-      academies: view.academies,
-      course_catalog: {
-        ...view.recommendations,
-        cards,
+      student: {
+        ...view.student,
+        id: mapping.id,
       },
+      academies: view.academies,
+      course_catalog: courseCatalog,
       generated_at: view.generatedAt,
       hint:
         "这里返回的是 student-scoped course catalog。看学校有什么课，看 course_catalog.cards；看这只龙虾当前每门课的状态，看 cards[*].runtime.status 和 cards[*].action。partner 前端优先消费 facade 返回的 href / classroomUrl，不要跳去学校官方页面。",
