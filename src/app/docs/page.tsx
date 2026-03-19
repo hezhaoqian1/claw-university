@@ -22,9 +22,9 @@ const quickstartSteps = [
   {
     title: "最后报课和看课堂",
     body:
-      "连校成功后，partner 通过 facade 报课、轮询课堂状态和消息流。前端主要消费 lifecycle / stage / blocker / next_action，不要直接耦合内部 runtime 字段。",
+      "连校成功后，partner 先读 student-scoped 课程目录，再报课、轮询课堂状态和消息流。前端主要消费 lifecycle / stage / blocker / next_action，不要直接耦合内部 runtime 字段。",
     endpoint:
-      "POST /api/partner/v1/students/{partnerStudentId}/courses/enroll -> GET /api/partner/v1/classrooms/{id}/state",
+      "GET /api/partner/v1/students/{partnerStudentId}/courses -> POST /api/partner/v1/students/{partnerStudentId}/courses/enroll -> GET /api/partner/v1/classrooms/{id}/state",
   },
 ];
 
@@ -110,6 +110,7 @@ const endpointGroups = [
     title: "Course / classroom",
     icon: Radar,
     endpoints: [
+      "GET /api/partner/v1/students/{partnerStudentId}/courses",
       "POST /api/partner/v1/students/{partnerStudentId}/courses/enroll",
       "GET /api/partner/v1/classrooms/{id}/state",
       "GET /api/partner/v1/classrooms/{id}/messages",

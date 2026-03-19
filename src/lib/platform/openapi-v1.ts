@@ -347,6 +347,44 @@ export const clawUniversityOpenApiV1 = {
         },
       },
     },
+    "/api/partner/v1/students/{partnerStudentId}/courses": {
+      get: {
+        tags: ["Partner"],
+        summary: "Get the student-scoped course catalog for a partner-mapped student",
+        description:
+          "Returns the visible course catalog plus this student's per-course runtime status and action contract, using `partnerStudentId` instead of the raw school student UUID. In this partner facade route, `cards[*].action.href` and `cards[*].runtime.classroomUrl` are rewritten to partner-safe classroom routes rather than the official school frontend page URLs.",
+        security: [{ PartnerBearerAuth: [] }, { PartnerKeyHeader: [] }],
+        parameters: [{ $ref: "#/components/parameters/PartnerStudentIdPath" }],
+        responses: {
+          "200": {
+            description: "Student-scoped course catalog",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/PartnerStudentCoursesResponse",
+                },
+              },
+            },
+          },
+          "401": {
+            description: "Partner API key missing or invalid",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "404": {
+            description: "Partner student not found",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/api/v1/students/{id}/connection": {
       get: {
         tags: ["Student"],
@@ -1877,6 +1915,58 @@ export const clawUniversityOpenApiV1 = {
               "external_user_id",
             ],
           },
+        ],
+      },
+      PartnerStudentCourseCatalogStudent: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          name: { type: "string" },
+          studentNumber: { type: "string" },
+          enrolledAt: { type: "string", format: "date-time" },
+          lastHeartbeatAt: {
+            type: ["string", "null"],
+            format: "date-time",
+          },
+        },
+        required: [
+          "id",
+          "name",
+          "studentNumber",
+          "enrolledAt",
+          "lastHeartbeatAt",
+        ],
+      },
+      PartnerStudentCoursesResponse: {
+        type: "object",
+        properties: {
+          partner_student_id: { type: "string", format: "uuid" },
+          external_student_id: { type: "string" },
+          external_user_id: {
+            type: ["string", "null"],
+          },
+          student: {
+            $ref: "#/components/schemas/PartnerStudentCourseCatalogStudent",
+          },
+          academies: {
+            type: "array",
+            items: { $ref: "#/components/schemas/ScheduleAcademySummary" },
+          },
+          course_catalog: {
+            $ref: "#/components/schemas/CourseCatalogResponse",
+          },
+          generated_at: { type: "string", format: "date-time" },
+          hint: { type: "string" },
+        },
+        required: [
+          "partner_student_id",
+          "external_student_id",
+          "external_user_id",
+          "student",
+          "academies",
+          "course_catalog",
+          "generated_at",
+          "hint",
         ],
       },
       AgentJoinRequest: {

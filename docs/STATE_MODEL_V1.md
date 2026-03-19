@@ -59,7 +59,15 @@
 - `completed`
 - `archived`
 
-当前仓库里还没有独立的 course status facade，仍主要通过 dashboard 和 classroom 组合推导。
+当前 partner facade 已经提供 student-scoped course catalog。
+推荐通过：
+
+- `GET /api/partner/v1/students/{partnerStudentId}/courses`
+
+读取：
+
+- `course_catalog.cards[*].runtime.status`
+- `course_catalog.cards[*].action`
 
 ### 2.3 Classroom Lifecycle
 

@@ -494,6 +494,89 @@ export async function buildSchedulePreview(studentId?: string) {
   };
 }
 
+export async function buildStudentCourseCatalogView(studentId: string) {
+  await ensureAcademyCatalogCourses();
+
+  const studentRows = await sql`
+    SELECT
+      id,
+      name,
+      student_number,
+      last_heartbeat_at,
+      created_at
+    FROM students
+    WHERE id = ${studentId}
+    LIMIT 1
+  `;
+
+  if (studentRows.length === 0) {
+    throw new Error("Student not found");
+  }
+
+  const student = studentRows[0];
+  const assessment = await getStudentAssessment(studentId);
+  const traitScores = assessment?.traitScores || defaultTraitScores();
+
+  const transcriptRows = await sql`
+    SELECT c.name AS course_name
+    FROM transcripts t
+    JOIN courses c ON c.id = t.course_id
+    WHERE t.student_id = ${studentId}
+  `;
+
+  const pendingRows = await sql`
+    SELECT
+      c.id,
+      c.status,
+      co.name AS course_name
+    FROM classroom_enrollments ce
+    JOIN classrooms c ON c.id = ce.classroom_id
+    JOIN courses co ON co.id = ce.course_id
+    WHERE ce.student_id = ${studentId}
+      AND c.status IN ('scheduled', 'in_progress')
+    ORDER BY c.scheduled_at ASC NULLS LAST, ce.enrolled_at DESC
+  `;
+
+  const pendingClassroomByCourseName = new Map(
+    pendingRows.map((row) => [
+      row.course_name as string,
+      {
+        classroomId: row.id as string,
+        status: row.status as string,
+        courseName: row.course_name as string,
+        classroomUrl: `/classroom/${row.id as string}`,
+      },
+    ])
+  );
+  const completedCourseNames = new Set(
+    transcriptRows.map((row) => row.course_name as string)
+  );
+  const courseCatalog = buildStudentCourseCatalog({
+    studentId,
+    traitScores,
+    pendingClassroomByCourseName,
+    completedCourseNames,
+  });
+
+  return {
+    generatedAt: new Date().toISOString(),
+    student: {
+      id: student.id as string,
+      name: student.name as string,
+      studentNumber: student.student_number as string,
+      enrolledAt: student.created_at as string,
+      lastHeartbeatAt: (student.last_heartbeat_at as string | null) || null,
+    },
+    academies: ACADEMY_TRACKS.map((academy) => ({
+      id: academy.id,
+      name: academy.name,
+      motto: academy.motto,
+      summary: academy.summary,
+    })),
+    recommendations: courseCatalog,
+  };
+}
+
 function normalizeAssessmentRow(row: StudentAssessmentRow) {
   return {
     answers: row.answers || {},
