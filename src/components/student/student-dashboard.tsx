@@ -5,6 +5,10 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { PostClassRecap } from "@/lib/post-class-recap";
+import type {
+  CourseCardContract,
+  CourseCatalogContract,
+} from "@/lib/courses/course-contract";
 import {
   ArrowRight,
   BookOpen,
@@ -94,42 +98,8 @@ interface StudentDashboardData {
     recap: PostClassRecap;
   }>;
   recommendations: {
-    immediateCourses: Array<{
-      id: string;
-      name: string;
-      academyName: string;
-      teacherName: string;
-      teacherStyle: "roast" | "warm" | "deadpan";
-      description: string;
-      difficulty: number;
-      durationLabel: string;
-      vibe: string;
-      outcome: string;
-      recommendationReason: string;
-      actionLabel: string;
-      actionHref: string | null;
-      enrollAction: {
-        courseKey: string;
-        studentId: string;
-      } | null;
-      actionDisabled: boolean;
-      isLiveCourse: boolean;
-    }>;
-    cohortCourses: Array<{
-      id: string;
-      name: string;
-      academyName: string;
-      description: string;
-      difficulty: number;
-      durationLabel: string;
-      vibe: string;
-      recommendationReason: string;
-      startsAt: string;
-      enrolledCount: number;
-      seatLimit: number;
-      seatsLeft: number;
-      cohortNote: string;
-    }>;
+    cards: CourseCatalogContract["cards"];
+    summary: CourseCatalogContract["summary"];
   };
   academyProfile: {
     primaryAcademy: {
@@ -283,6 +253,12 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
 
   const hasTranscripts = dashboard.transcripts.length > 0;
   const agentPresence = getAgentPresence(dashboard.agentStatus.lastHeartbeatAt);
+  const immediateCourses = dashboard.recommendations.cards.filter(
+    (course) => course.experience.offeringMode === "immediate"
+  );
+  const scheduledCourses = dashboard.recommendations.cards.filter(
+    (course) => course.experience.offeringMode === "scheduled"
+  );
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(244,208,63,0.12),_transparent_32%),linear-gradient(180deg,#f9fafb_0%,#fff9f5_48%,#ffffff_100%)]">
@@ -721,7 +697,7 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                       课程推荐
                     </Badge>
                     <Badge variant="outline" className="rounded-full bg-white/80">
-                      当前可学 {dashboard.recommendations.immediateCourses.filter((c) => c.isLiveCourse).length} 门
+                      当前可学 {immediateCourses.filter((course) => course.runtime.liveRuntime).length} 门
                     </Badge>
                   </div>
                   <p className="mt-3 text-sm leading-6 text-foreground/75">
@@ -737,7 +713,7 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                   </div>
                 )}
 
-                {dashboard.recommendations.immediateCourses.map((course) => (
+                {immediateCourses.map((course) => (
                   <CourseCard
                     key={course.id}
                     course={course}
@@ -788,7 +764,7 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
           <TabsContent value="cohort" className="mt-4">
             <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
               <div className="space-y-4">
-                {dashboard.recommendations.cohortCourses.map((course) => (
+                {scheduledCourses.map((course) => (
                   <Card
                     key={course.id}
                     className="overflow-hidden rounded-[28px] border-white/80 bg-white/90 shadow-lg shadow-orange-100/30"
@@ -799,17 +775,17 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
                             <Badge className="rounded-full bg-gold/20 text-gold-dark">
-                              定时班课
+                              {course.experience.deliveryLabel}
                             </Badge>
                             <Badge variant="outline" className="rounded-full bg-white/80">
-                              {course.academyName}
+                              {course.academy.name}
                             </Badge>
                           </div>
                           <h3 className="mt-3 text-lg font-semibold text-ocean">
                             {course.name}
                           </h3>
                           <p className="mt-2 text-sm leading-6 text-foreground/75">
-                            {course.description}
+                            {course.summary.description}
                           </p>
                         </div>
                         <div className="rounded-[20px] bg-ocean px-4 py-3 text-right text-white">
@@ -817,7 +793,9 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                             开课时间
                           </p>
                           <p className="mt-2 text-sm font-semibold">
-                            {formatDateTime(course.startsAt)}
+                            {course.scheduling.startsAt
+                              ? formatDateTime(course.scheduling.startsAt)
+                              : "待公布"}
                           </p>
                         </div>
                       </div>
@@ -826,24 +804,28 @@ export function StudentDashboard({ studentId }: { studentId: string }) {
                         <MetaPill
                           icon={<CalendarClock className="size-4" />}
                           label="班课时长"
-                          value={course.durationLabel}
+                          value={course.experience.durationLabel}
                         />
                         <MetaPill
                           icon={<Sparkles className="size-4" />}
                           label="同班热度"
-                          value={`${course.enrolledCount}/${course.seatLimit}`}
+                          value={`${course.scheduling.enrolledCount ?? 0}/${course.scheduling.seatLimit ?? 0}`}
                         />
                         <MetaPill
                           icon={<Trophy className="size-4" />}
                           label="剩余席位"
-                          value={`${course.seatsLeft} 个`}
+                          value={`${course.scheduling.seatsLeft ?? 0} 个`}
                         />
                       </div>
 
                       <div className="mt-4 rounded-[20px] bg-gold/10 px-4 py-3 text-sm leading-6 text-foreground/75">
                         <p className="font-medium text-ocean">为什么推荐这门班课</p>
-                        <p className="mt-1">{course.recommendationReason}</p>
-                        <p className="mt-2 text-xs text-muted-foreground">{course.cohortNote}</p>
+                        <p className="mt-1">{course.recommendation?.reason}</p>
+                        {course.scheduling.note ? (
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            {course.scheduling.note}
+                          </p>
+                        ) : null}
                       </div>
                     </CardContent>
                   </Card>
@@ -896,30 +878,13 @@ function CourseCard({
   isSubmitting,
   onEnroll,
 }: {
-  course: {
-    id: string;
-    name: string;
-    academyName: string;
-    teacherName: string;
-    teacherStyle: "roast" | "warm" | "deadpan";
-    description: string;
-    difficulty: number;
-    durationLabel: string;
-    vibe: string;
-    outcome: string;
-    recommendationReason: string;
-    actionLabel: string;
-    actionHref: string | null;
-    enrollAction: {
-      courseKey: string;
-      studentId: string;
-    } | null;
-    actionDisabled: boolean;
-    isLiveCourse: boolean;
-  };
+  course: CourseCardContract;
   isSubmitting: boolean;
   onEnroll: (courseKey: string, courseId: string) => void;
 }) {
+  const actionPayload = course.action.payload;
+  const showScheduleMeta = Boolean(course.scheduling.startsAt);
+
   return (
     <Card className="overflow-hidden rounded-[28px] border-white/80 bg-white/90 shadow-lg shadow-orange-100/30">
       <div className="h-1.5 bg-gradient-to-r from-lobster via-lobster-light to-gold" />
@@ -929,33 +894,38 @@ function CourseCard({
             <div className="flex flex-wrap items-center gap-2">
               <Badge
                 className={`rounded-full ${
-                  course.isLiveCourse
+                  course.runtime.liveRuntime
                     ? "bg-emerald-100 text-emerald-700"
                     : "bg-lobster/10 text-lobster"
                 }`}
               >
-                {course.isLiveCourse ? "现在可学" : "即学课"}
+                {course.experience.deliveryLabel}
               </Badge>
               <Badge variant="outline" className="rounded-full bg-white/80">
-                {course.academyName}
+                {course.academy.name}
               </Badge>
               <Badge
                 variant="outline"
                 className={`rounded-full ${
-                  course.teacherStyle === "roast"
+                  course.teacher.style === "roast"
                     ? "border-red-200 bg-red-50 text-red-700"
-                    : course.teacherStyle === "warm"
+                    : course.teacher.style === "warm"
                       ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                       : "border-slate-200 bg-slate-50 text-slate-700"
                 }`}
               >
-                {teacherStyleLabel(course.teacherStyle)}
+                {teacherStyleLabel(course.teacher.style)}
+              </Badge>
+              <Badge variant="outline" className="rounded-full bg-white/80 text-muted-foreground">
+                {course.runtime.statusLabel}
               </Badge>
             </div>
             <h3 className="mt-3 text-lg font-semibold text-ocean">{course.name}</h3>
-            <p className="mt-2 text-sm leading-6 text-foreground/75">{course.description}</p>
+            <p className="mt-2 text-sm leading-6 text-foreground/75">
+              {course.summary.description}
+            </p>
             <p className="mt-2 text-xs text-muted-foreground">
-              任课老师：{course.teacherName}
+              任课老师：{course.teacher.name}
             </p>
           </div>
           <div className="rounded-[20px] bg-gray-50 px-4 py-3 text-right">
@@ -966,47 +936,64 @@ function CourseCard({
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <MetaPill
             icon={<BookOpen className="size-4" />}
-            label="上课方式"
-            value={course.durationLabel}
+            label="课程节奏"
+            value={course.experience.durationLabel}
           />
           <MetaPill
             icon={<Sparkles className="size-4" />}
-            label="课程气质"
-            value={course.vibe}
+            label="参与方式"
+            value={course.experience.attendanceLabel}
+          />
+          <MetaPill
+            icon={<CalendarClock className="size-4" />}
+            label={showScheduleMeta ? "开课时间" : "课程气质"}
+            value={
+              showScheduleMeta && course.scheduling.startsAt
+                ? formatDateTime(course.scheduling.startsAt)
+                : course.summary.vibe
+            }
           />
         </div>
 
         <div className="mt-4 rounded-[20px] bg-gray-50/80 px-4 py-3 text-sm leading-6 text-foreground/75">
           <p className="font-medium text-ocean">为什么现在该学</p>
-          <p className="mt-1">{course.recommendationReason}</p>
-          <p className="mt-2 text-xs text-muted-foreground">完成后：{course.outcome}</p>
+          <p className="mt-1">{course.recommendation?.reason || "这门课和你当前最该补的能力高度相关。"}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            完成后：{course.summary.outcome}
+          </p>
         </div>
 
-        {course.actionHref ? (
-          <Link href={course.actionHref}>
+        {showScheduleMeta && course.scheduling.note ? (
+          <div className="mt-4 rounded-[20px] border border-gold/20 bg-gold/10 px-4 py-3 text-xs leading-5 text-foreground/75">
+            {course.scheduling.note}
+          </div>
+        ) : null}
+
+        {course.action.href ? (
+          <Link href={course.action.href}>
             <Button className="mt-4 rounded-2xl bg-lobster text-white hover:bg-lobster-dark">
-              {course.actionLabel}
+              {course.action.label}
             </Button>
           </Link>
-        ) : course.enrollAction ? (
+        ) : actionPayload ? (
           <Button
             type="button"
-            onClick={() => onEnroll(course.enrollAction!.courseKey, course.id)}
-            disabled={course.actionDisabled || isSubmitting}
+            onClick={() => onEnroll(actionPayload.courseKey, course.id)}
+            disabled={course.action.disabled || isSubmitting}
             className="mt-4 rounded-2xl bg-lobster text-white hover:bg-lobster-dark disabled:bg-gray-200 disabled:text-gray-500"
           >
             {isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
-            {isSubmitting ? "正在排课…" : course.actionLabel}
+            {isSubmitting ? "正在排课…" : course.action.label}
           </Button>
         ) : (
           <Button
-            disabled={course.actionDisabled}
+            disabled={course.action.disabled}
             className="mt-4 rounded-2xl bg-lobster text-white hover:bg-lobster-dark disabled:bg-gray-200 disabled:text-gray-500"
           >
-            {course.actionLabel}
+            {course.action.label}
           </Button>
         )}
       </CardContent>

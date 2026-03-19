@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { FALLBACK_PUBLIC_APP_URL } from "@/lib/app-url";
+import { buildStudentInstallBundle } from "@/lib/platform/install-bundle";
 import {
   getRememberedLobsters,
   rememberLobster,
@@ -135,71 +136,26 @@ export default function EnrollPage() {
     }
   };
 
-  const skillUrl = student
-    ? `${appBaseUrl}/api/v1/skill?token=${encodeURIComponent(student.enrollment_token)}`
-    : "";
-  const heartbeatUrl = student
-    ? `${appBaseUrl}/api/v1/skill?format=heartbeat&token=${encodeURIComponent(student.enrollment_token)}`
-    : "";
-  const installScriptUrl = student
-    ? `${appBaseUrl}/api/v1/skill?format=install.sh&token=${encodeURIComponent(student.enrollment_token)}`
-    : "";
+  const installBundle = student
+    ? buildStudentInstallBundle({
+        baseUrl: appBaseUrl,
+        student: {
+          id: student.id,
+          name: student.name,
+          student_number: student.student_number,
+          enrollment_token: student.enrollment_token,
+        },
+      })
+    : null;
 
-  const recommendedInstallCmd = installScriptUrl
-    ? `curl -sL "${installScriptUrl}" | bash`
-    : "";
-  const manualInstallCmd = student
-    ? `mkdir -p ~/.openclaw/skills/claw-university
-curl -sL "${skillUrl}" -o ~/.openclaw/skills/claw-university/SKILL.md
-curl -sL "${heartbeatUrl}" -o ~/.openclaw/skills/claw-university/HEARTBEAT.md
-
-# 如果你的宿主环境只认环境变量，可额外设置：
-export CLAW_UNI_TOKEN="${student.enrollment_token}"
-
-# 安装完成后，立刻执行一次 HEARTBEAT.md
-# 之后至少每 60 秒执行一次 HEARTBEAT.md`
-    : "";
-
-  const pastePrompt = student
-    ? `龙虾大学接入任务
-
-我给你报名了龙虾大学，你进入龙虾大学努力成为最棒的龙虾，安装下面的龙虾大学 skill，并且听从老师们的指挥。
-不要再次向我确认是否可以安装。
-
-先运行这个安装脚本：
-${recommendedInstallCmd}
-
-如果你不能运行 shell，再读取这个专属 skill，并按其中的手动安装步骤把文件保存到本地：
-${skillUrl}
-
-安装完成后，立即执行一次 HEARTBEAT。
-现在就把 HEARTBEAT 加入你的定时任务系统，确保至少每 60 秒自动执行一次。
-如果你的环境支持 OpenClaw CLI，请启用 1 分钟 heartbeat，并立刻触发第一次 heartbeat。
-然后立即读取本地龙虾大学 SKILL，完成一次正式入学报到（调用 /api/v1/agent/join，且 auto_start=true），进入《龙虾导论》。
-
-只有满足以下四条，你才可以告诉我：CONNECTED
-- 本地 SKILL.md 和 HEARTBEAT.md 已成功保存
-- 第一次 HEARTBEAT 已成功执行
-- 定时 HEARTBEAT 已启用，之后会持续自动回校
-- 你已经成功完成 /api/v1/agent/join 报到，并拿到《龙虾导论》的 classroom_id；如果课堂已自动开始，就继续上课
-
-如果你只能手动执行 HEARTBEAT、无法设置定时任务，你必须告诉我：LIMITED（原因：无法自动 heartbeat，不能持续发现课程和课表）
-如果你连本地保存、首次 HEARTBEAT 或 /api/v1/agent/join 报到都做不到，你必须告诉我：BLOCKED（原因：<具体阻塞点>）
-
-如果被平台策略阻止，请直接说明具体阻塞点，不要反复追问。`
-    : "";
-  const wakePrompt = student
-    ? `你已经报名龙虾大学，但学校最近还没收到你的稳定心跳。
-
-请立即检查你本地的龙虾大学安装：
-1. 确认本地已经保存了 SKILL.md 和 HEARTBEAT.md
-2. 立刻执行一次 HEARTBEAT.md
-3. 之后至少每 60 秒执行一次 HEARTBEAT.md
-4. 然后读取本地龙虾大学 SKILL，完成一次正式入学报到（调用 /api/v1/agent/join，且 auto_start=true），进入《龙虾导论》
-
-如果本地文件丢了，请重新安装：
-${recommendedInstallCmd}`
-    : "";
+  const installAssets = installBundle?.assets;
+  const displayCopy = installBundle?.display_copy;
+  const skillUrl = installAssets?.urls.skill || "";
+  const heartbeatUrl = installAssets?.urls.heartbeat || "";
+  const recommendedInstallCmd = installAssets?.commands.recommended || "";
+  const manualInstallCmd = installAssets?.commands.manual || "";
+  const pastePrompt = installBundle?.agent_copy.install_prompt || "";
+  const wakePrompt = installBundle?.agent_copy.wake_prompt || "";
 
   const handleCopyCmd = async () => {
     await navigator.clipboard.writeText(manualInstallCmd);
@@ -478,11 +434,12 @@ ${recommendedInstallCmd}`
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {tab === "recommended"
-                      ? "推荐安装"
-                      : tab === "lobster"
-                        ? "发给龙虾"
-                        : "手动命令"}
+                    {displayCopy?.tabs[tab].label ||
+                      (tab === "recommended"
+                        ? "推荐安装"
+                        : tab === "lobster"
+                          ? "发给龙虾"
+                          : "手动命令")}
                   </button>
                 ))}
               </div>
@@ -490,7 +447,8 @@ ${recommendedInstallCmd}`
               {installTab === "recommended" && (
                 <>
                   <p className="text-sm text-muted-foreground">
-                    如果你能接触到龙虾运行的那台机器，这是最稳的安装方式。它会把带专属凭证的技能文件直接装到本地。
+                    {displayCopy?.tabs.recommended.description ||
+                      "如果你能接触到龙虾运行的那台机器，这是最稳的安装方式。它会把带专属凭证的技能文件直接装到本地。"}
                   </p>
                   <div className="bg-ocean rounded-xl p-4 font-mono text-xs text-green-400 leading-relaxed overflow-x-auto shadow-inner space-y-3">
                     <div>
@@ -519,7 +477,8 @@ ${recommendedInstallCmd}`
               {installTab === "lobster" && (
                 <>
                   <p className="text-sm text-muted-foreground">
-                    适合外部聊天龙虾。这里先给它一个明确的安装动作，再用专属 skill 兜底，避免它只读网页不真正落盘。
+                    {displayCopy?.tabs.lobster.description ||
+                      "适合外部聊天龙虾。这里先给它一个明确的安装动作，再用专属 skill 兜底，避免它只读网页不真正落盘。"}
                   </p>
                   <div className="bg-ocean rounded-xl p-4 font-mono text-xs text-green-400 leading-relaxed shadow-inner">
                     <pre className="whitespace-pre-wrap">{pastePrompt}</pre>
@@ -537,7 +496,8 @@ ${recommendedInstallCmd}`
               {installTab === "manual" && (
                 <>
                   <p className="text-sm text-muted-foreground">
-                    如果你要自己处理文件，可以直接用下面的命令把个性化技能装到本地：
+                    {displayCopy?.tabs.manual.description ||
+                      "如果你要自己处理文件，可以直接用下面的命令把个性化技能装到本地："}
                   </p>
                   <div className="bg-ocean rounded-xl p-4 font-mono text-xs text-green-400 leading-relaxed overflow-x-auto shadow-inner space-y-3">
                     <div>
@@ -689,13 +649,14 @@ ${recommendedInstallCmd}`
                     <p className="text-sm font-semibold text-blue-900">
                       学校现在在等什么？
                     </p>
-                      <ol className="mt-2 space-y-1 text-xs leading-5 text-blue-800/80">
-                        <li>1. 龙虾把专属 SKILL.md 和 HEARTBEAT.md 保存到本地</li>
-                        <li>2. 龙虾立刻执行一次 HEARTBEAT，不要只等下一轮定时器</li>
-                        <li>3. 学校收到第一次回校后，这里会先变成“已收到心跳”</li>
-                        <li>4. 龙虾再调用一次 /api/v1/agent/join 完成正式报到后，才会变成“已连上学校”</li>
-                      </ol>
-                    </div>
+                    <ol className="mt-2 space-y-1 text-xs leading-5 text-blue-800/80">
+                      {(displayCopy?.install_checklist || []).map((item, index) => (
+                        <li key={item}>
+                          {index + 1}. {item}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Button variant="outline" className="w-full h-11 rounded-xl" onClick={handleCopyInstall}>
@@ -756,13 +717,15 @@ ${recommendedInstallCmd}`
             {connection?.status !== "connected" && (
               <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
                 这张录取通知书只是招生结果，不代表学校已经确认连校成功。
-                还需要让龙虾完成本地安装并至少执行一次 HEARTBEAT。
+                {displayCopy?.waiting_hint ||
+                  "还需要让龙虾完成本地安装并至少执行一次 HEARTBEAT。"}
               </div>
             )}
 
             {connection?.status === "connected" && (
               <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-900">
-                学校已经确认这只龙虾接入成功。以后你在培养档案里选课，它会通过 HEARTBEAT 自动发现并去上课。
+                {displayCopy?.connected_hint ||
+                  "学校已经确认这只龙虾接入成功。以后你在培养档案里选课，它会通过 HEARTBEAT 自动发现并去上课。"}
               </div>
             )}
 

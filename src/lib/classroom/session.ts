@@ -16,6 +16,7 @@ import {
   skillActionsToCapabilityGrants,
 } from "@/lib/course-results";
 import { assignHomework } from "@/lib/homework";
+import { appendPartnerEventsForStudent } from "@/lib/partners";
 import type { CapabilityGrant, LectureStep } from "@/types";
 
 export interface ActiveSession {
@@ -44,10 +45,16 @@ const drivingClassrooms = new Set<string>();
 const processingClassrooms = new Set<string>();
 const finishingClassrooms = new Set<string>();
 
-export async function getSession(classroomId: string): Promise<ActiveSession | undefined> {
+export async function getSession(
+  classroomId: string,
+  options: { resumeIfNeeded?: boolean } = {}
+): Promise<ActiveSession | undefined> {
+  const { resumeIfNeeded = true } = options;
   const cached = activeSessions.get(classroomId);
   if (cached) {
-    resumeSessionIfNeeded(cached);
+    if (resumeIfNeeded) {
+      resumeSessionIfNeeded(cached);
+    }
     return cached;
   }
 
@@ -90,7 +97,9 @@ export async function getSession(classroomId: string): Promise<ActiveSession | u
   };
 
   activeSessions.set(classroomId, session);
-  resumeSessionIfNeeded(session);
+  if (resumeIfNeeded) {
+    resumeSessionIfNeeded(session);
+  }
   return session;
 }
 
@@ -475,6 +484,21 @@ async function finishSession(classroomId: string): Promise<void> {
 
     await sql`UPDATE classrooms SET status = 'completed', ended_at = now() WHERE id = ${classroomId}`;
     await markEnrollmentCompleted(classroomId, session.studentId);
+
+    await appendPartnerEventsForStudent({
+      studentId: session.studentId,
+      classroomId,
+      eventType: "classroom.completed",
+      payload: {
+        classroom_id: classroomId,
+        course_key: session.courseRuntimeKey,
+        course_name: runtime.meta.name,
+        grade: evaluation.grade,
+        score: evaluation.total_score,
+        first_deliverable_required: Boolean(firstDeliverable),
+        capability_grants: capabilityGrants,
+      },
+    });
 
     await insertSystemMessage(classroomId, "课程结束");
   } finally {

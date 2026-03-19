@@ -5,6 +5,7 @@ import {
   normalizeFirstDeliverable,
   submitFirstDeliverable,
 } from "@/lib/course-results";
+import { appendPartnerEventsForStudent } from "@/lib/partners";
 
 export async function POST(
   req: NextRequest,
@@ -68,6 +69,18 @@ export async function POST(
       WHERE classroom_id = ${classroomId}
         AND student_id = ${student_id}
     `;
+
+    await appendPartnerEventsForStudent({
+      studentId: student_id,
+      classroomId,
+      eventType: "classroom.first_deliverable_submitted",
+      payload: {
+        title: submittedDeliverable.title,
+        artifact_type: submittedDeliverable.artifact_type,
+        artifact_url: submittedDeliverable.artifact_url,
+        submitted_at: submittedDeliverable.submitted_at,
+      },
+    });
 
     return NextResponse.json({
       accepted: true,

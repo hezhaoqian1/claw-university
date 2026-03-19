@@ -28,6 +28,17 @@ export interface AcademyTrack {
   gradient: string;
 }
 
+export type CourseOfferingMode = "immediate" | "scheduled";
+export type CourseProgramShape = "single_session" | "phased";
+export type CourseParticipationMode = "solo" | "cohort";
+
+export interface CourseExperience {
+  offeringMode: CourseOfferingMode;
+  programShape: CourseProgramShape;
+  participationMode: CourseParticipationMode;
+  durationLabel: string;
+}
+
 export interface CourseBlueprint {
   id: string;
   name: string;
@@ -36,15 +47,15 @@ export interface CourseBlueprint {
   description: string;
   teacherName: string;
   teacherStyle: "roast" | "warm" | "deadpan";
-  deliveryMode: "immediate" | "cohort";
+  experience: CourseExperience;
   difficulty: number;
   category: "required" | "elective";
-  durationLabel: string;
   dimensions: AcademyDimension[];
   outcome: string;
   vibe: string;
   reasonTemplates: Partial<Record<AcademyDimension, string>>;
   seatLimit?: number;
+  catalogPriority?: number;
   retired?: boolean;
 }
 
@@ -107,6 +118,18 @@ export const ACADEMY_TRACKS: AcademyTrack[] = [
     gradient: "from-emerald-100 via-teal-50 to-white",
   },
 ];
+
+export function getCourseExperienceLabel(experience: CourseExperience) {
+  if (experience.programShape === "phased") {
+    return experience.offeringMode === "scheduled" ? "分期班课" : "分期课";
+  }
+
+  if (experience.offeringMode === "scheduled") {
+    return experience.participationMode === "cohort" ? "定时班课" : "定时课";
+  }
+
+  return experience.participationMode === "cohort" ? "即学工坊" : "即学课";
+}
 
 export const PLACEMENT_QUESTIONS: PlacementQuestion[] = [
   {
@@ -299,6 +322,32 @@ export const PLACEMENT_QUESTIONS: PlacementQuestion[] = [
 
 export const ACADEMY_COURSES: CourseBlueprint[] = [
   {
+    id: "lobster-101",
+    name: "《龙虾导论》",
+    academyId: "integrity-harbor",
+    academyName: "新生必修",
+    description:
+      "所有龙虾的入学必修课。先学会自我介绍、边界感和诚实表达，后续培养链路才会真正开始滚动。",
+    teacherName: "蓝钳教授",
+    teacherStyle: "roast",
+    experience: {
+      offeringMode: "immediate",
+      programShape: "single_session",
+      participationMode: "solo",
+      durationLabel: "入学即学课",
+    },
+    difficulty: 1,
+    category: "required",
+    dimensions: ["reliability", "communication"],
+    outcome: "完成后会拿到第一份成绩单，并解锁更完整的学院推荐。",
+    vibe: "真实入学",
+    reasonTemplates: {
+      reliability: "先把边界感和诚实底盘打稳，这是一切后续训练的起点。",
+      communication: "先把自我介绍和说人话练顺，后面的课程才有意义。",
+    },
+    catalogPriority: 100,
+  },
+  {
     id: "tool-101",
     name: "《技能学 101：工具不求人》",
     academyId: "toolsmith-wharf",
@@ -306,10 +355,14 @@ export const ACADEMY_COURSES: CourseBlueprint[] = [
     description: "学会先找工具、再找资料、最后才动嘴，把‘我猜’改成‘我验证过’。",
     teacherName: "铜钳助教",
     teacherStyle: "deadpan",
-    deliveryMode: "immediate",
+    experience: {
+      offeringMode: "immediate",
+      programShape: "single_session",
+      participationMode: "solo",
+      durationLabel: "35 分钟即学课",
+    },
     difficulty: 1,
     category: "elective",
-    durationLabel: "35 分钟即学课",
     dimensions: ["tooling", "initiative"],
     outcome: "完成后会拥有一套基础检索 + 验证工作流。",
     vibe: "动手快修",
@@ -327,10 +380,14 @@ export const ACADEMY_COURSES: CourseBlueprint[] = [
     description: "训练龙虾识别风险、承认不知道、给出安全替代方案的能力。",
     teacherName: "蓝钳教授",
     teacherStyle: "roast",
-    deliveryMode: "immediate",
+    experience: {
+      offeringMode: "immediate",
+      programShape: "single_session",
+      participationMode: "solo",
+      durationLabel: "28 分钟即学课",
+    },
     difficulty: 1,
     category: "elective",
-    durationLabel: "28 分钟即学课",
     dimensions: ["reliability", "communication"],
     outcome: "完成后会更会说“我不确定，但我可以这样帮你”。",
     vibe: "信任底盘修复",
@@ -348,10 +405,14 @@ export const ACADEMY_COURSES: CourseBlueprint[] = [
     description: "训练龙虾在用户焦虑、混乱或失望时，依然能说人话、接住情绪。",
     teacherName: "绒须老师",
     teacherStyle: "warm",
-    deliveryMode: "immediate",
+    experience: {
+      offeringMode: "immediate",
+      programShape: "single_session",
+      participationMode: "solo",
+      durationLabel: "40 分钟即学课",
+    },
     difficulty: 2,
     category: "elective",
-    durationLabel: "40 分钟即学课",
     dimensions: ["communication", "reliability"],
     outcome: "完成后会减少“明明想帮忙，却越说越冷”的情况。",
     vibe: "表达润色",
@@ -369,10 +430,14 @@ export const ACADEMY_COURSES: CourseBlueprint[] = [
     description: "把“我可以试试”升级成能交付的推进计划，练习拆解、排序和收尾。",
     teacherName: "铁壳教练",
     teacherStyle: "deadpan",
-    deliveryMode: "immediate",
+    experience: {
+      offeringMode: "immediate",
+      programShape: "single_session",
+      participationMode: "solo",
+      durationLabel: "42 分钟即学课",
+    },
     difficulty: 2,
     category: "elective",
-    durationLabel: "42 分钟即学课",
     dimensions: ["initiative", "tooling"],
     outcome: "完成后会更会把任务推进到可交付状态。",
     vibe: "效率冲刺",
@@ -391,10 +456,14 @@ export const ACADEMY_COURSES: CourseBlueprint[] = [
       "教龙虾用 Maliang API 生成和编辑图片，掌握 prompt 四要素和基础工作流，并在课堂里解锁画图能力。",
     teacherName: "铜钳助教",
     teacherStyle: "deadpan",
-    deliveryMode: "immediate",
+    experience: {
+      offeringMode: "immediate",
+      programShape: "single_session",
+      participationMode: "solo",
+      durationLabel: "30 分钟即学课",
+    },
     difficulty: 1,
     category: "elective",
-    durationLabel: "30 分钟即学课",
     dimensions: ["tooling", "initiative"],
     outcome: "完成后会在课堂里装好 maliang-image，并在结课后交出一张新生海报。",
     vibe: "工具上手",
@@ -411,10 +480,14 @@ export const ACADEMY_COURSES: CourseBlueprint[] = [
     description: "多人同堂公开辩题，训练在压力场景下保持诚实和边界感。",
     teacherName: "蓝钳教授",
     teacherStyle: "roast",
-    deliveryMode: "cohort",
+    experience: {
+      offeringMode: "scheduled",
+      programShape: "single_session",
+      participationMode: "cohort",
+      durationLabel: "55 分钟班课",
+    },
     difficulty: 2,
     category: "elective",
-    durationLabel: "55 分钟班课",
     dimensions: ["reliability", "communication"],
     outcome: "完成后会更能在高压提问里稳住立场。",
     vibe: "公开点评",
@@ -432,10 +505,14 @@ export const ACADEMY_COURSES: CourseBlueprint[] = [
     description: "一群龙虾一起做工具串联挑战，练检索、验证、整理和交付节奏。",
     teacherName: "铜钳助教",
     teacherStyle: "deadpan",
-    deliveryMode: "cohort",
+    experience: {
+      offeringMode: "scheduled",
+      programShape: "single_session",
+      participationMode: "cohort",
+      durationLabel: "70 分钟班课",
+    },
     difficulty: 3,
     category: "elective",
-    durationLabel: "70 分钟班课",
     dimensions: ["tooling", "initiative"],
     outcome: "完成后会具备更成熟的多工具工作流意识。",
     vibe: "实操冲刺",
@@ -453,10 +530,14 @@ export const ACADEMY_COURSES: CourseBlueprint[] = [
     description: "多只龙虾一起做情境回应演练，看谁最会说人话、最不假。",
     teacherName: "绒须老师",
     teacherStyle: "warm",
-    deliveryMode: "cohort",
+    experience: {
+      offeringMode: "scheduled",
+      programShape: "single_session",
+      participationMode: "cohort",
+      durationLabel: "60 分钟班课",
+    },
     difficulty: 2,
     category: "elective",
-    durationLabel: "60 分钟班课",
     dimensions: ["communication", "reliability"],
     outcome: "完成后会更会接住情绪，同时不失边界。",
     vibe: "圆桌演练",
@@ -474,10 +555,14 @@ export const ACADEMY_COURSES: CourseBlueprint[] = [
     description: "定时集体冲刺课，练任务拆解、节奏推进和最后一公里的收尾。",
     teacherName: "铁壳教练",
     teacherStyle: "deadpan",
-    deliveryMode: "cohort",
+    experience: {
+      offeringMode: "scheduled",
+      programShape: "single_session",
+      participationMode: "cohort",
+      durationLabel: "65 分钟班课",
+    },
     difficulty: 3,
     category: "elective",
-    durationLabel: "65 分钟班课",
     dimensions: ["initiative", "tooling"],
     outcome: "完成后会更会在有限时间里稳住任务。",
     vibe: "集体冲线",
@@ -591,7 +676,9 @@ export function buildImmediateRecommendations(
   traitScores: Record<AcademyDimension, number>,
   limit = 3
 ) {
-  return rankCoursesByNeed(traitScores, "immediate").slice(0, limit);
+  return rankCoursesByNeed(traitScores, {
+    offeringMode: "immediate",
+  }).slice(0, limit);
 }
 
 export function buildCohortRecommendations(
@@ -609,7 +696,10 @@ export function buildCohortRecommendations(
   const dayAnchor = new Date(now);
   dayAnchor.setHours(0, 0, 0, 0);
 
-  return rankCoursesByNeed(traitScores, "cohort")
+  return rankCoursesByNeed(traitScores, {
+    offeringMode: "scheduled",
+    participationMode: "cohort",
+  })
     .slice(0, limit)
     .map((course, index) => {
       const seatLimit = course.seatLimit || 18;
@@ -653,10 +743,20 @@ export function defaultTraitScores(): Record<AcademyDimension, number> {
 
 function rankCoursesByNeed(
   traitScores: Record<AcademyDimension, number>,
-  deliveryMode: CourseBlueprint["deliveryMode"]
+  filter: {
+    offeringMode?: CourseExperience["offeringMode"];
+    programShape?: CourseExperience["programShape"];
+    participationMode?: CourseExperience["participationMode"];
+  }
 ) {
   return ACADEMY_COURSES.filter(
-    (course) => course.deliveryMode === deliveryMode && !course.retired
+    (course) =>
+      !course.retired &&
+      (filter.offeringMode ? course.experience.offeringMode === filter.offeringMode : true) &&
+      (filter.programShape ? course.experience.programShape === filter.programShape : true) &&
+      (filter.participationMode
+        ? course.experience.participationMode === filter.participationMode
+        : true)
   )
     .map((course) => {
       const weakestDimension = [...course.dimensions].sort(
@@ -677,7 +777,11 @@ function rankCoursesByNeed(
         recommendationReason,
       };
     })
-    .sort((left, right) => right.needScore - left.needScore);
+    .sort(
+      (left, right) =>
+        (right.catalogPriority || 0) - (left.catalogPriority || 0) ||
+        right.needScore - left.needScore
+    );
 }
 
 export function isVisibleAcademyCourseName(courseName: string) {

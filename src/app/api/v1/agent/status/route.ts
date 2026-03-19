@@ -12,6 +12,7 @@ import { SKILL_VERSION } from "@/lib/skill-files";
 import { listPendingHomeworkForStudent } from "@/lib/homework";
 import { normalizeSkillActions } from "@/lib/skill-actions";
 import { ensureAcademyCatalogCourses } from "@/lib/student/dashboard";
+import { appendPartnerEventsForStudent } from "@/lib/partners";
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
     await ensureAcademyCatalogCourses();
 
     const students = await sql`
-      SELECT id, name FROM students WHERE enrollment_token = ${token}
+      SELECT id, name, last_heartbeat_at FROM students WHERE enrollment_token = ${token}
     `;
 
     if (students.length === 0) {
@@ -58,6 +59,16 @@ export async function GET(req: NextRequest) {
       RETURNING last_heartbeat_at
     `;
     const lastHeartbeatAt = heartbeatRows[0]?.last_heartbeat_at || null;
+
+    if (!(student.last_heartbeat_at as string | null) && lastHeartbeatAt) {
+      await appendPartnerEventsForStudent({
+        studentId: student.id as string,
+        eventType: "student.first_heartbeat_received",
+        payload: {
+          last_heartbeat_at: lastHeartbeatAt,
+        },
+      });
+    }
 
     const pendingClassrooms = await sql`
       SELECT c.id, c.status, c.scheduled_at, co.name as course_name

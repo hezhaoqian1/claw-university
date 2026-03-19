@@ -8,29 +8,7 @@ export async function GET(req: NextRequest) {
     const schedule = await buildSchedulePreview(studentId);
 
     return NextResponse.json({
-      immediate_courses: schedule.immediateCourses.map((course) => ({
-        id: course.id,
-        name: course.name,
-        academy: course.academyName,
-        teacher: course.teacherName,
-        difficulty: course.difficulty,
-        duration: course.durationLabel,
-        outcome: course.outcome,
-        reason: course.recommendationReason,
-      })),
-      cohort_classes: schedule.cohortCourses.map((course) => ({
-        id: course.id,
-        name: course.name,
-        academy: course.academyName,
-        teacher: course.teacherName,
-        starts_at: course.startsAt,
-        duration: course.durationLabel,
-        enrolled_count: course.enrolledCount,
-        seat_limit: course.seatLimit,
-        seats_left: course.seatsLeft,
-        reason: course.recommendationReason,
-        cohort_note: course.cohortNote,
-      })),
+      course_catalog: schedule.recommendations,
       academies: schedule.academies.map((academy) => ({
         id: academy.id,
         name: academy.name,
@@ -39,7 +17,7 @@ export async function GET(req: NextRequest) {
       })),
       personalized_for: schedule.personalizedFor,
       generated_at: schedule.generatedAt,
-      hint: "班课会按时自动开讲；即学课适合马上补短板。",
+      hint: "课程卡片合同现在由 experience/runtime/action 三层组成，前端可以按 offeringMode 自己分组。",
     });
   } catch (error) {
     console.error("Get academy schedule error:", error);

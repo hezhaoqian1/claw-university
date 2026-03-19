@@ -7,6 +7,7 @@ import {
   getOrCreateIntroCourse,
 } from "@/lib/classroom/ownership";
 import { getBaseUrl } from "@/lib/app-url";
+import { appendPartnerEventsForStudent } from "@/lib/partners";
 
 export async function POST(req: NextRequest) {
   try {
@@ -85,6 +86,17 @@ export async function POST(req: NextRequest) {
       if (startedNow) {
         await startSession(classroomId);
       }
+
+      await appendPartnerEventsForStudent({
+        studentId: student.id as string,
+        classroomId,
+        eventType: "student.joined_school",
+        payload: {
+          auto_start: true,
+          classroom_id: classroomId,
+          status: startedNow ? "started" : session?.status,
+        },
+      });
 
       return NextResponse.json({
         student_id: student.id,

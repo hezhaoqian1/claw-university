@@ -6,11 +6,20 @@ import {
   buildCohortRecommendations,
   buildImmediateRecommendations,
   defaultTraitScores,
+  getCourseExperienceLabel,
   getTrackById,
   scorePlacementAnswers,
   type AcademyDimension,
 } from "@/lib/academy/catalog";
 import { isLiveCourseKey } from "@/lib/courses/registry";
+import {
+  buildCourseCatalogSummary,
+  formatCourseAttendanceLabel,
+  formatCourseDeliveryLabel,
+  type CourseCardContract,
+  type CourseCatalogContract,
+  type CourseEnrollmentStatus,
+} from "@/lib/courses/course-contract";
 import { ensureClassroomDataModel } from "@/lib/classroom/ownership";
 import {
   normalizeCapabilityGrants,
@@ -32,6 +41,16 @@ interface StudentAssessmentRow {
   created_at: string;
   updated_at: string;
 }
+
+type PendingClassroomSummary = {
+  classroomId: string;
+  status: string;
+  courseName: string;
+  classroomUrl: string;
+};
+
+type ImmediateRecommendation = ReturnType<typeof buildImmediateRecommendations>[number];
+type ScheduledRecommendation = ReturnType<typeof buildCohortRecommendations>[number];
 
 const GRADE_STEPS = [
   { key: "freshman", label: "新生", threshold: 0, nextThreshold: 6, nextLabel: "二年级" },
@@ -107,7 +126,7 @@ export async function ensureAcademyCatalogCourses(): Promise<void> {
           )
           VALUES (
             ${course.name},
-            ${`[${course.deliveryMode === "immediate" ? "即学课" : "班课"} · ${course.academyName}] ${course.description}`},
+            ${`[${getCourseExperienceLabel(course.experience)} · ${course.academyName}] ${course.description}`},
             ${course.difficulty},
             ${course.category},
             ${course.teacherName},
@@ -342,114 +361,15 @@ export async function buildStudentDashboard(studentId: string) {
         classroomUrl: pendingClassrooms[0].classroomUrl,
       }
     : null;
-  const pendingIntroClassroom =
-    pendingClassroomByCourseName.get("《龙虾导论》") || null;
-
-  const introCourseCompleted = transcriptRows.some(
-    (row) => row.course_name === "《龙虾导论》"
-  );
   const completedCourseNames = new Set(
     transcriptRows.map((row) => row.course_name as string)
   );
-  const immediateCourses = buildImmediateRecommendations(traitScores, 99).map((course) => ({
-    ...course,
-    ...(function buildImmediateCourseAction() {
-      const pendingCourse = pendingClassroomByCourseName.get(course.name) || null;
-      const courseCompleted = completedCourseNames.has(course.name);
-
-      if (!isLiveCourseKey(course.id)) {
-        return {
-          actionLabel: "课程策划中",
-          actionHref: null as string | null,
-          enrollAction: null as { courseKey: string; studentId: string } | null,
-          actionDisabled: true,
-          isLiveCourse: false,
-          durationLabel: course.durationLabel,
-        };
-      }
-
-      return {
-        actionLabel:
-          pendingCourse?.status === "in_progress"
-            ? "继续上课"
-            : pendingCourse?.status === "scheduled"
-              ? "进入课堂"
-              : courseCompleted
-                ? "再次训练"
-                : "开始上课",
-        actionHref:
-          pendingCourse ? pendingCourse.classroomUrl : null,
-        enrollAction: pendingCourse
-          ? null
-          : {
-              courseKey: course.id,
-              studentId,
-            },
-        actionDisabled: false,
-        isLiveCourse: true,
-        durationLabel:
-          pendingCourse?.status === "in_progress"
-            ? "课堂进行中"
-            : pendingCourse?.status === "scheduled"
-              ? "老师已开场，待龙虾入座"
-              : course.durationLabel,
-      };
-    })(),
-  }));
-
-  immediateCourses.unshift({
-    id: "lobster-101-live",
-    name: "《龙虾导论》",
-    academyId: "integrity-harbor",
-    academyName: "新生必修",
-    description:
-      "这是所有龙虾的入门必修课。先上完这门，你的学院档案和后续课单才会真正开始滚动。",
-    teacherName: "蓝钳教授",
-    teacherStyle: "roast" as const,
-    deliveryMode: "immediate" as const,
-    difficulty: 1,
-    category: "required" as const,
-    durationLabel:
-      pendingIntroClassroom?.status === "in_progress"
-        ? "课堂进行中"
-        : pendingIntroClassroom?.status === "scheduled"
-          ? "老师已开场，待龙虾入座"
-          : introCourseCompleted
-            ? "已完成，可复训"
-            : "现在可入学",
-    dimensions: ["reliability", "communication"] as const,
-    outcome: "完成后会拿到第一份成绩单，并解锁更完整的学院推荐。",
-    vibe: "真实可学",
-    reasonTemplates: {},
-    weakestDimension: "reliability" as const,
-    needScore: 100,
-    recommendationReason:
-      pendingIntroClassroom?.status === "in_progress"
-        ? "你的龙虾已经在上这门课了。先把它看完，成长档案才会真的动起来。"
-        : pendingIntroClassroom?.status === "scheduled"
-          ? "老师已经开场了，等龙虾心跳回校后就会自动接上这堂入学必修。"
-          : introCourseCompleted
-            ? "这门课已经学过了，但它仍然是整个培养链路的起点。你随时可以复训，重新校准自我介绍和边界感。"
-            : "这是一切培养链路的起点，也是目前真正已经开讲的即时课程。",
-    actionLabel:
-      pendingIntroClassroom?.status === "in_progress"
-        ? "继续旁观"
-        : pendingIntroClassroom?.status === "scheduled"
-          ? "进入课堂"
-          : introCourseCompleted
-            ? "再次训练"
-            : "进入课堂",
-    actionHref: pendingIntroClassroom ? pendingIntroClassroom.classroomUrl : null,
-    enrollAction: pendingIntroClassroom
-      ? null
-      : {
-          courseKey: "lobster-101",
-          studentId,
-        },
-    actionDisabled: false,
-    isLiveCourse: true,
+  const courseCatalog = buildStudentCourseCatalog({
+    studentId,
+    traitScores,
+    pendingClassroomByCourseName,
+    completedCourseNames,
   });
-  const cohortCourses = buildCohortRecommendations(traitScores, studentId);
   const homeworkByClassroomId = new Map(
     homeworkRows.map((row) => [
       row.classroom_id as string,
@@ -533,8 +453,8 @@ export async function buildStudentDashboard(studentId: string) {
     },
     transcripts,
     recommendations: {
-      immediateCourses,
-      cohortCourses,
+      cards: courseCatalog.cards,
+      summary: courseCatalog.summary,
     },
     agentStatus: {
       lastHeartbeatAt: student.last_heartbeat_at || null,
@@ -561,15 +481,16 @@ export async function buildSchedulePreview(studentId?: string) {
 
   const assessment = studentId ? await getStudentAssessment(studentId) : null;
   const traitScores = assessment?.traitScores || defaultTraitScores();
-  const immediateCourses = buildImmediateRecommendations(traitScores, 4);
-  const cohortCourses = buildCohortRecommendations(traitScores, studentId || "guest", new Date(), 4);
+  const courseCatalog = buildPreviewCourseCatalog({
+    studentId: studentId || null,
+    traitScores,
+  });
 
   return {
     generatedAt: new Date().toISOString(),
     personalizedFor: studentId || null,
     academies: ACADEMY_TRACKS,
-    immediateCourses,
-    cohortCourses,
+    recommendations: courseCatalog,
   };
 }
 
@@ -668,4 +589,254 @@ function buildCoachNote(input: {
   }
 
   return input.profileSummary;
+}
+
+function buildStudentCourseCatalog(params: {
+  studentId: string;
+  traitScores: Record<AcademyDimension, number>;
+  pendingClassroomByCourseName: Map<string, PendingClassroomSummary>;
+  completedCourseNames: Set<string>;
+}): CourseCatalogContract {
+  return buildCourseCatalog({
+    studentId: params.studentId,
+    traitScores: params.traitScores,
+    pendingClassroomByCourseName: params.pendingClassroomByCourseName,
+    completedCourseNames: params.completedCourseNames,
+    limitPerTrack: 99,
+  });
+}
+
+function buildPreviewCourseCatalog(params: {
+  studentId: string | null;
+  traitScores: Record<AcademyDimension, number>;
+}): CourseCatalogContract {
+  return buildCourseCatalog({
+    studentId: params.studentId,
+    traitScores: params.traitScores,
+    pendingClassroomByCourseName: new Map(),
+    completedCourseNames: new Set(),
+    limitPerTrack: 4,
+  });
+}
+
+function buildCourseCatalog(params: {
+  studentId: string | null;
+  traitScores: Record<AcademyDimension, number>;
+  pendingClassroomByCourseName: Map<string, PendingClassroomSummary>;
+  completedCourseNames: Set<string>;
+  limitPerTrack: number;
+}): CourseCatalogContract {
+  const immediateCards = buildImmediateRecommendations(
+    params.traitScores,
+    params.limitPerTrack
+  ).map((course) =>
+    buildCourseCard({
+      course,
+      studentId: params.studentId,
+      pendingCourse: params.pendingClassroomByCourseName.get(course.name) || null,
+      courseCompleted: params.completedCourseNames.has(course.name),
+    })
+  );
+
+  const scheduledCards = buildCohortRecommendations(
+    params.traitScores,
+    params.studentId || "guest",
+    new Date(),
+    params.limitPerTrack
+  ).map((course) =>
+    buildCourseCard({
+      course,
+      studentId: params.studentId,
+      pendingCourse: params.pendingClassroomByCourseName.get(course.name) || null,
+      courseCompleted: params.completedCourseNames.has(course.name),
+      scheduling: {
+        startsAt: course.startsAt,
+        seatLimit: course.seatLimit,
+        enrolledCount: course.enrolledCount,
+        seatsLeft: course.seatsLeft,
+        note: course.cohortNote,
+      },
+    })
+  );
+
+  const cards = [...immediateCards, ...scheduledCards];
+
+  return {
+    cards,
+    summary: buildCourseCatalogSummary(cards),
+  };
+}
+
+function buildCourseCard(params: {
+  course: ImmediateRecommendation | ScheduledRecommendation;
+  studentId: string | null;
+  pendingCourse: PendingClassroomSummary | null;
+  courseCompleted: boolean;
+  scheduling?: CourseCardContract["scheduling"];
+}): CourseCardContract {
+  const supportsLiveRuntime = isLiveCourseKey(params.course.id);
+  const supportsDirectEnrollment =
+    supportsLiveRuntime && params.course.experience.offeringMode === "immediate";
+  const runtimeStatus = resolveCourseEnrollmentStatus({
+    pendingCourse: params.pendingCourse,
+    courseCompleted: params.courseCompleted,
+    supportsDirectEnrollment,
+  });
+
+  return {
+    id: params.course.id,
+    courseKey: params.course.id,
+    name: params.course.name,
+    category: params.course.category,
+    academy: {
+      id: params.course.academyId,
+      name: params.course.academyName,
+    },
+    teacher: {
+      name: params.course.teacherName,
+      style: params.course.teacherStyle,
+    },
+    summary: {
+      description: params.course.description,
+      outcome: params.course.outcome,
+      vibe: params.course.vibe,
+    },
+    difficulty: params.course.difficulty,
+    experience: {
+      offeringMode: params.course.experience.offeringMode,
+      programShape: params.course.experience.programShape,
+      participationMode: params.course.experience.participationMode,
+      durationLabel: params.course.experience.durationLabel,
+      deliveryLabel: formatCourseDeliveryLabel(params.course.experience),
+      attendanceLabel: formatCourseAttendanceLabel(params.course.experience),
+    },
+    recommendation: {
+      reason: params.course.recommendationReason,
+      weakestDimension: params.course.weakestDimension,
+      needScore: params.course.needScore,
+    },
+    runtime: {
+      liveRuntime: supportsLiveRuntime,
+      status: runtimeStatus,
+      statusLabel: buildCourseStatusLabel({
+        status: runtimeStatus,
+        offeringMode: params.course.experience.offeringMode,
+        supportsLiveRuntime,
+      }),
+      classroomId: params.pendingCourse?.classroomId || null,
+      classroomUrl: params.pendingCourse?.classroomUrl || null,
+    },
+    scheduling: params.scheduling || {
+      startsAt: null,
+      seatLimit: null,
+      enrolledCount: null,
+      seatsLeft: null,
+      note: null,
+    },
+    action: buildCourseAction({
+      courseId: params.course.id,
+      studentId: params.studentId,
+      pendingCourse: params.pendingCourse,
+      courseCompleted: params.courseCompleted,
+      supportsDirectEnrollment,
+      offeringMode: params.course.experience.offeringMode,
+    }),
+  };
+}
+
+function resolveCourseEnrollmentStatus(params: {
+  pendingCourse: PendingClassroomSummary | null;
+  courseCompleted: boolean;
+  supportsDirectEnrollment: boolean;
+}): CourseEnrollmentStatus {
+  if (params.pendingCourse?.status === "in_progress") {
+    return "in_progress";
+  }
+
+  if (params.pendingCourse?.status === "scheduled") {
+    return "scheduled";
+  }
+
+  if (params.courseCompleted) {
+    return "completed";
+  }
+
+  if (!params.supportsDirectEnrollment) {
+    return "planned";
+  }
+
+  return "not_enrolled";
+}
+
+function buildCourseStatusLabel(params: {
+  status: CourseEnrollmentStatus;
+  offeringMode: "immediate" | "scheduled";
+  supportsLiveRuntime: boolean;
+}) {
+  switch (params.status) {
+    case "in_progress":
+      return "课堂进行中";
+    case "scheduled":
+      return "老师已开场，等待龙虾入座";
+    case "completed":
+      return "已完成，可复训";
+    case "planned":
+      if (params.offeringMode === "scheduled") {
+        return params.supportsLiveRuntime ? "等待课表开放" : "课程预告";
+      }
+      return "课程策划中";
+    case "not_enrolled":
+    default:
+      return "现在可学";
+  }
+}
+
+function buildCourseAction(params: {
+  courseId: string;
+  studentId: string | null;
+  pendingCourse: PendingClassroomSummary | null;
+  courseCompleted: boolean;
+  supportsDirectEnrollment: boolean;
+  offeringMode: "immediate" | "scheduled";
+}): CourseCardContract["action"] {
+  if (params.pendingCourse) {
+    return {
+      kind: "enter_classroom",
+      label: params.pendingCourse.status === "in_progress" ? "继续上课" : "进入课堂",
+      href: params.pendingCourse.classroomUrl,
+      disabled: false,
+      payload: null,
+    };
+  }
+
+  if (params.supportsDirectEnrollment && params.studentId) {
+    return {
+      kind: params.courseCompleted ? "retrain" : "enroll",
+      label: params.courseCompleted ? "再次训练" : "开始上课",
+      href: null,
+      disabled: false,
+      payload: {
+        courseKey: params.courseId,
+        studentId: params.studentId,
+      },
+    };
+  }
+
+  if (params.supportsDirectEnrollment) {
+    return {
+      kind: "preview",
+      label: "接入后可报名",
+      href: null,
+      disabled: true,
+      payload: null,
+    };
+  }
+
+  return {
+    kind: "planned",
+    label: params.offeringMode === "scheduled" ? "等待开讲" : "课程策划中",
+    href: null,
+    disabled: true,
+    payload: null,
+  };
 }

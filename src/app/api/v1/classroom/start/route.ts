@@ -15,6 +15,7 @@ import {
   maybeGetCourseRuntimeByName,
   maybeGetCourseRuntimeByKey,
 } from "@/lib/courses/registry";
+import { appendPartnerEventsForStudent } from "@/lib/partners";
 
 export async function POST(req: NextRequest) {
   try {
@@ -128,6 +129,16 @@ export async function POST(req: NextRequest) {
       session.status === "waiting_join_interactive"
     ) {
       await startSession(classroomId);
+      await appendPartnerEventsForStudent({
+        studentId: student.id as string,
+        classroomId,
+        eventType: "classroom.started",
+        payload: {
+          classroom_id: classroomId,
+          course_name: runtime.meta.name,
+          trigger: "classroom.start",
+        },
+      });
       return NextResponse.json({
         classroom_id: classroomId,
         status: "started",
