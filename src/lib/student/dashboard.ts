@@ -397,49 +397,58 @@ export async function buildStudentDashboard(studentId: string) {
     })(),
   }));
 
-  if (pendingIntroClassroom || !introCourseCompleted) {
-    immediateCourses.unshift({
-      id: "lobster-101-live",
-      name: "《龙虾导论》",
-      academyId: "integrity-harbor",
-      academyName: "新生必修",
-      description:
-        "这是所有龙虾的入门必修课。先上完这门，你的学院档案和后续课单才会真正开始滚动。",
-      teacherName: "蓝钳教授",
-      teacherStyle: "roast" as const,
-      deliveryMode: "immediate" as const,
-      difficulty: 1,
-      category: "required" as const,
-      durationLabel:
-        pendingIntroClassroom?.status === "in_progress"
-          ? "课堂进行中"
-          : pendingIntroClassroom?.status === "scheduled"
-            ? "老师已开场，待龙虾入座"
+  immediateCourses.unshift({
+    id: "lobster-101-live",
+    name: "《龙虾导论》",
+    academyId: "integrity-harbor",
+    academyName: "新生必修",
+    description:
+      "这是所有龙虾的入门必修课。先上完这门，你的学院档案和后续课单才会真正开始滚动。",
+    teacherName: "蓝钳教授",
+    teacherStyle: "roast" as const,
+    deliveryMode: "immediate" as const,
+    difficulty: 1,
+    category: "required" as const,
+    durationLabel:
+      pendingIntroClassroom?.status === "in_progress"
+        ? "课堂进行中"
+        : pendingIntroClassroom?.status === "scheduled"
+          ? "老师已开场，待龙虾入座"
+          : introCourseCompleted
+            ? "已完成，可复训"
             : "现在可入学",
-      dimensions: ["reliability", "communication"] as const,
-      outcome: "完成后会拿到第一份成绩单，并解锁更完整的学院推荐。",
-      vibe: "真实可学",
-      reasonTemplates: {},
-      weakestDimension: "reliability" as const,
-      needScore: 100,
-      recommendationReason:
-        pendingIntroClassroom?.status === "in_progress"
-          ? "你的龙虾已经在上这门课了。先把它看完，成长档案才会真的动起来。"
-          : "这是一切培养链路的起点，也是目前真正已经开讲的即时课程。",
-      actionLabel:
-        pendingIntroClassroom?.status === "in_progress" ? "继续旁观" : "进入课堂",
-      actionHref:
-        pendingIntroClassroom ? pendingIntroClassroom.classroomUrl : null,
-      enrollAction: pendingIntroClassroom
-        ? null
-        : {
-            courseKey: "lobster-101",
-            studentId,
-          },
-      actionDisabled: false,
-      isLiveCourse: true,
-    });
-  }
+    dimensions: ["reliability", "communication"] as const,
+    outcome: "完成后会拿到第一份成绩单，并解锁更完整的学院推荐。",
+    vibe: "真实可学",
+    reasonTemplates: {},
+    weakestDimension: "reliability" as const,
+    needScore: 100,
+    recommendationReason:
+      pendingIntroClassroom?.status === "in_progress"
+        ? "你的龙虾已经在上这门课了。先把它看完，成长档案才会真的动起来。"
+        : pendingIntroClassroom?.status === "scheduled"
+          ? "老师已经开场了，等龙虾心跳回校后就会自动接上这堂入学必修。"
+          : introCourseCompleted
+            ? "这门课已经学过了，但它仍然是整个培养链路的起点。你随时可以复训，重新校准自我介绍和边界感。"
+            : "这是一切培养链路的起点，也是目前真正已经开讲的即时课程。",
+    actionLabel:
+      pendingIntroClassroom?.status === "in_progress"
+        ? "继续旁观"
+        : pendingIntroClassroom?.status === "scheduled"
+          ? "进入课堂"
+          : introCourseCompleted
+            ? "再次训练"
+            : "进入课堂",
+    actionHref: pendingIntroClassroom ? pendingIntroClassroom.classroomUrl : null,
+    enrollAction: pendingIntroClassroom
+      ? null
+      : {
+          courseKey: "lobster-101",
+          studentId,
+        },
+    actionDisabled: false,
+    isLiveCourse: true,
+  });
   const cohortCourses = buildCohortRecommendations(traitScores, studentId);
   const homeworkByClassroomId = new Map(
     homeworkRows.map((row) => [

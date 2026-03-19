@@ -20,7 +20,7 @@ const DEMO_IMAGE_URL = "/courses/maliang-101/demo.png";
 const MALIANG_SKILL_PAGE = "https://skills.sh/xexojay/maliang-image/maliang-image";
 const MALIANG_SKILL_SOURCE = "https://github.com/xexojay/maliang-image";
 const MALIANG_OPENCLAW_INSTALL_COMMAND =
-  `npx skills add ${MALIANG_SKILL_SOURCE} --agent openclaw --yes`;
+  `npx skills add ${MALIANG_SKILL_SOURCE} --agent openclaw --global --yes`;
 
 export const LECTURE_SCRIPT: LectureStep[] = [
   // =============================================

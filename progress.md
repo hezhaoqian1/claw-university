@@ -113,3 +113,58 @@
 - Verification completed for the course-homework hardening slice:
   - `npm run build` ✅
   - `npm run lint` ✅
+- New design task started:
+  - activated planning files for a dedicated course-system design pass
+  - inspected `maliang-101`, `registry.ts`, and `catalog.ts`
+  - confirmed the next step is to design a stronger reusable course product, not patch more low-level APIs first
+- Continued the design pass:
+  - inspected `src/types.ts` and `src/lib/classroom/session.ts` to confirm the exact current authoring/output contract
+  - inspected classroom playback UI and repo docs to confirm the current user-facing prestart experience
+- Completed the design deliverable:
+  - added `docs/COURSE_SYSTEM.md` as the dedicated course product / protocol / submission design doc
+  - documented the upgraded `maliang-101` experience, including first deliverable and capability-unlock design
+  - documented the reusable 9-step course framework, target runtime contract, frontend/backend/database implications, and future contributor workflow
+  - linked the new doc from `README.md`
+- Refined the design based on product direction:
+  - changed tool-course timing from "post-class install" to "in-class unlock/install"
+  - added `unlockActions`, `tool_unlock`, `unlock_failed`, and capability-grant tracking to the design doc
+  - clarified that homework comes after the first post-class artifact and owner report
+- Runtime implementation completed for the first tool-course loop:
+  - extended the shared type system with `tool_unlock`, `capability_grants`, and `first_deliverable`
+  - upgraded `maliang-101` from a prompt-only class to a prompt + workflow + in-class unlock course
+  - taught the classroom session runner to block on unlock success and persist granted capabilities
+  - added transcript-backed first-deliverable storage plus `POST /api/v1/classroom/[id]/deliverable`
+  - updated result/heartbeat payloads, recap generation, and classroom result UI to surface unlocked abilities and the first submitted artifact
+  - updated `SKILL.md` / `HEARTBEAT.md` so agents do first deliverable before notify/claim
+  - verification completed: `npm run lint` ✅, `npm run build` ✅
+- Reliability/doc sync follow-up completed:
+  - fixed session recovery so a restart during final grading resumes `finishSession()` instead of dropping the classroom back into `waiting_response`
+  - removed the implicit "grant unlocked capabilities anyway" fallback from final transcript generation
+  - refreshed `README.md`, `docs/ARCHITECTURE.md`, and `docs/ARCHITECTURE_V3.md` so they match the shipped tool-course loop and persistence status
+- Documentation structure cleanup completed:
+  - corrected README’s runtime wording so persistence vs hot-cache is no longer contradictory
+  - rewrote the data-model section to separate `schema.sql` truth from runtime migration truth
+  - split the old monolithic `docs/COURSE_SYSTEM.md` into:
+    - shipped fact layer: `docs/COURSE_SYSTEM.md`
+    - current course design layer: `docs/MALIANG_101.md`
+    - future platform layer: `docs/COURSE_PLATFORM_FUTURE.md`
+  - added a pointer in `docs/ARCHITECTURE_V3.md` clarifying that it is a blueprint/history doc, not the canonical shipped-state source
+- Architecture doc cleanup completed:
+  - retitled `docs/ARCHITECTURE.md` as the current implementation architecture doc and linked it to fact/future course docs
+  - updated course runtime fields, `LectureStep`, transcript schema, API list, and result-processing order to match the shipped tool-course loop
+  - removed the old `待办` block and replaced it with current limitations only
+  - strengthened `docs/ARCHITECTURE_V3.md` header so future agents read README / COURSE_SYSTEM before the blueprint
+- OpenClaw install / auto-start protocol hardening completed:
+  - `pending_classroom` in `/api/v1/agent/status` now carries explicit "already approved / start immediately / do not ask again" metadata
+  - `HEARTBEAT.md` and `SKILL.md` now explicitly forbid asking for a second owner confirmation when `pending_classroom` exists
+  - `SKILL.md` now states the normal OpenClaw skill install path for `install_skill`: `npx skills add <source> --agent openclaw --yes`
+  - `maliang-101` classroom unlock prompt now gives a concrete OpenClaw install command and explicitly says not to wait for post-class `skill_actions`
+  - verification completed: `npm run lint` ✅, `npm run build` ✅
+- Follow-up normalization completed:
+  - aligned the concrete `maliang-101` unlock command with the same `npx skills add <source> --agent openclaw --yes` pattern used in `SKILL.md`
+  - reran `npm run lint` and `npm run build`; both passed again after the command normalization
+- Runtime hardening follow-up completed:
+  - fixed `classroom_messages_message_type_check` so runtime-inserted `unlock` messages are legal in both live migrations and fresh base schema
+  - added idempotent homework table healing (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...`) for runtime-owned homework columns to reduce old-schema `500`s
+  - hardened `/api/v1/homework/submit` with UUID-format validation so malformed IDs fail as `400` instead of bubbling into SQL exceptions
+  - reran `npm run lint` and `npm run build`; build passed after the hardening

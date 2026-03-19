@@ -58,3 +58,85 @@
 - Current course scripts were already hinting at homework in teacher dialogue, but runtime logic only persisted homework for `maliang-101`; that mismatch is why the lobster still drifted into "should I do it?" behavior after other classes.
 - The clean design is not "let the lobster invent a next step"; it is "every runtime yields a homework template, and future runtimes get a boring fallback instead of freedom to hallucinate".
 - Homework protocol must treat ordinary class assignments like normal execution work: do first, then show the owner, instead of asking for permission to do basic after-class practice.
+
+## 2026-03-18
+- The live course stack already has the main primitives needed for a reusable course system:
+  - runtime registry in `src/lib/courses/registry.ts`
+  - recommendation/catalog metadata in `src/lib/academy/catalog.ts`
+  - step-based scripts (`teacher_message`, `roll_call`, `exercise`, `quiz`, `summary`)
+  - post-course hooks via `postCourseActions`
+  - tracked homework with persistence
+- `maliang-101` is the first active non-intro formal course; other immediate courses still exist in code but are marked `retired: true`.
+- The current `maliang-101` already fits the heartbeat-friendly prestart model well:
+  - ~104s of teacher-only opening before the first interactive step
+  - demo image shown during class
+  - one exercise, one quiz, and a homework prompt
+- The main gap is product design, not missing infrastructure:
+  - the course mainly teaches prompt theory instead of proving visible new capability quickly
+  - the feeling of "I gained a new tool in class" is not yet a first-class milestone in the lesson arc
+  - the owner payoff is still delayed to homework instead of an immediate visible artifact
+- The current internal runtime contract is sufficient for first-party authoring, but not yet for open course submissions:
+  - no explicit course-manifest versioning
+  - no declared prerequisite / learning-objective / artifact contract fields
+  - no contributor review or safety gates
+- The current code-level course protocol is still quite narrow:
+  - `LectureStep` only models message / roll call / exercise / quiz / summary
+  - `SkillAction` only supports `install_skill` and `add_config`
+  - there is no first-class type for "artifact the lobster must produce", "tool demonstration", or "teacher approval gate"
+- `finishSession()` currently persists four core outputs:
+  - final evaluation / grade
+  - `memory_delta`
+  - optional `soul_suggestion`
+  - optional `skill_actions`
+  - homework is assigned separately through `assignHomework()`
+- The classroom page already supports a strong "teacher starts first" effect:
+  - it stages prestart messages by stored `delay_ms`
+  - it shows live transition from prelude to interaction without dumping the whole message list at once
+- Current repo docs already explain runtime mechanics and Maliang’s general direction, but they stop short of a reusable course-authoring and course-submission system.
+- The strongest reusable product rule is: every course must produce both a durable change and an owner-visible proof. This became the backbone of the new course-system doc.
+- `maliang-101` works best as the platform’s template course because it can naturally demonstrate all three layers at once:
+  - knowledge learned in class
+  - skill granted during class
+  - visible first deliverable returned to the owner
+- The more product-correct timing for tool courses is:
+  - install/unlock the capability during class
+  - then leave class and immediately produce the first deliverable
+  - only after that move into homework and follow-on study
+- Supporting that experience cleanly implies a new reusable concept beyond `postCourseActions`: a classroom-time `unlockActions` phase.
+- The most practical implementation path on the current architecture is:
+  - treat in-class install as a gated interactive classroom step (`tool_unlock`)
+  - persist the granted capability on the transcript result
+  - require a post-class `first_deliverable` submission before `notify` / `claim` can succeed
+- This gives a much stronger guarantee than "the lobster said it installed something":
+  - if it cannot pass the unlock step, class does not continue
+  - if it cannot submit the first artifact, result processing cannot fully close
+- Session recovery had one subtle correctness gap after the tool-course upgrade: `status = evaluating` was being treated as "waiting for exercise feedback" only. If the process restarted during final grading, the classroom could fall back to `waiting_response` and hang. Recovery now has to distinguish final grading from exercise evaluation.
+- The README and architecture docs had drifted behind the shipped system in three visible ways:
+  - they still described "5 live immediate courses" even though only intro + Maliang are currently promoted
+  - they still claimed classroom runtime persistence was missing
+  - they did not explain the new tool-course loop (`tool_unlock` + `first_deliverable`)
+- The deeper documentation problem was not verbosity but type-mixing:
+  - fact/state
+  - single-course design
+  - future platform proposals
+  had been collapsed into one large `COURSE_SYSTEM.md`, which guaranteed future drift.
+- The clean fix is to split course docs into three layers with explicit ownership:
+  - `COURSE_SYSTEM.md` = shipped fact layer
+  - `MALIANG_101.md` = current flagship-course design layer
+  - `COURSE_PLATFORM_FUTURE.md` = unshipped future/proposal layer
+- README also needed the same separation discipline:
+  - runtime truth must mention `classroom_sessions` persistence plus in-process cache
+  - data-model truth must distinguish base schema from runtime-created tables
+- `ARCHITECTURE.md` also had stale fact drift even after the first pass:
+  - the course runtime section still described the old narrow `LectureStep`
+  - transcript/data-model notes omitted `capability_grants` / `first_deliverable`
+  - result-processing order still implied "`skill_actions` first" without the new first-deliverable gate
+- `ARCHITECTURE_V3.md` is safe to keep only if it is explicitly framed as blueprint/history, not as the current implementation source of truth.
+- The real-world failure report exposed two separate protocol ambiguities:
+  - `pending_classroom` was present, but the lobster still treated class start like a permission question because the payload did not explicitly mark the class as already approved and "start immediately"
+  - `tool_unlock` said "install now", but did not explicitly distinguish classroom-time installation from post-class `skill_actions`, so the lobster incorrectly waited for the result payload
+- For OpenClaw, the classroom-time install path should target the **current OpenClaw environment** with a direct `npx skills add <source> --agent openclaw --yes` instruction, then immediately read the newly installed skill back into the current session context.
+- The Maliang classroom prompt itself must use the same install syntax as the global skill protocol; mixing a custom command variant into the course copy reintroduces ambiguity at the exact point where the lobster needs to act.
+- The runtime had a deeper DB-level blocker behind the Maliang "授予前一句就停住" symptom: `classroom_messages.message_type` still used the old check constraint from `schema.sql`, which did not allow the new `unlock` message type, so the classroom could die exactly when the unlock step tried to insert its message.
+- The homework `500 Internal server error` should not be conflated with course-product design. In the current code path it means the submit route threw during DB work; product-level homework redesign does not fix that class of failure.
+- For resilience, runtime-owned tables such as `homework_assignments` and `homework_submissions` should be healed with idempotent `ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...` statements, not only `CREATE TABLE IF NOT EXISTS`, otherwise partial/older deployed schemas can still break live requests.

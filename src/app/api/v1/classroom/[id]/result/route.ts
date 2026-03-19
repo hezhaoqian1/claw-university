@@ -143,11 +143,54 @@ export async function GET(
         firstDeliverableForGate &&
         firstDeliverableForGate.status !== "submitted"
       ) {
+        const t = transcripts[0];
+        const skillActions = normalizeSkillActions(t.skill_actions);
+        const capabilityGrants = normalizeCapabilityGrants(t.capability_grants);
+        const recap = buildPostClassRecap({
+          grade: t.grade as string,
+          teacherComment: t.teacher_comment as string | null,
+          memoryDelta: t.memory_delta as string | null,
+          soulSuggestion: t.soul_suggestion as string | null,
+          skillActions,
+          capabilityGrants,
+          firstDeliverable: firstDeliverableForGate,
+          homework,
+        });
+
         return NextResponse.json(
           {
             ready: true,
             blocked: true,
+            blocked_stage: "first_deliverable",
             message: "请先提交这门课的第一份作品，再汇报或认领成绩。",
+            report_required: true,
+            report_instruction:
+              "如果第一份作品被工具、API、权限、额度或网络问题卡住，必须先在你和当前人类用户的聊天里把成绩和阻塞点告诉主人；只是暂时不要请求 notify_url 或 claim_url。notify_url 只是学校回执，不是给主人发消息。",
+            evaluation: {
+              total_score: t.final_score,
+              grade: t.grade,
+              comment: t.teacher_comment,
+              comment_style: t.teacher_comment_style,
+              memory_delta: t.memory_delta,
+              soul_suggestion: t.soul_suggestion,
+              skill_actions: skillActions,
+              capability_grants: capabilityGrants,
+              first_deliverable: {
+                ...firstDeliverableForGate,
+                submit_url: deliverableSubmitUrl.toString(),
+              },
+              homework,
+              recap,
+              recap_text: buildOwnerRecapMessage({
+                courseName: t.course_name as string,
+                grade: t.grade as string,
+                score: Number(t.final_score),
+                recap,
+                firstDeliverable: firstDeliverableForGate,
+              }),
+              notify_url: notifyUrl.toString(),
+              claim_url: claimUrl.toString(),
+            },
             first_deliverable: {
               ...firstDeliverableForGate,
               submit_url: deliverableSubmitUrl.toString(),

@@ -11,6 +11,7 @@ import { buildOwnerRecapMessage, buildPostClassRecap } from "@/lib/post-class-re
 import { SKILL_VERSION } from "@/lib/skill-files";
 import { listPendingHomeworkForStudent } from "@/lib/homework";
 import { normalizeSkillActions } from "@/lib/skill-actions";
+import { ensureAcademyCatalogCourses } from "@/lib/student/dashboard";
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
@@ -21,6 +22,7 @@ export async function GET(req: NextRequest) {
 
   try {
     await ensureClassroomDataModel();
+    await ensureAcademyCatalogCourses();
 
     const students = await sql`
       SELECT id, name FROM students WHERE enrollment_token = ${token}
