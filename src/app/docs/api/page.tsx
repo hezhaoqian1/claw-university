@@ -7,7 +7,7 @@ export const metadata = {
 
 export default function ApiDocsPage() {
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950">
+    <div className="text-slate-950">
       <style>{`
         @import url("https://unpkg.com/swagger-ui-dist@5/swagger-ui.css");
 
@@ -26,8 +26,8 @@ export default function ApiDocsPage() {
         }
       `}</style>
 
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="space-y-6">
+        <div className="rounded-[32px] border border-slate-200 bg-white/90 p-8 shadow-sm shadow-slate-200/60">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-3">
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-500">
@@ -43,6 +43,12 @@ export default function ApiDocsPage() {
             </div>
 
             <div className="flex flex-col gap-3 text-sm text-slate-600 sm:flex-row">
+              <a
+                href="/docs"
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                开发者入口
+              </a>
               <a
                 href="/api/v1/openapi"
                 target="_blank"
@@ -61,7 +67,7 @@ export default function ApiDocsPage() {
           </div>
         </div>
 
-        <div className="mb-6 grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-3">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-sm font-semibold text-slate-900">Partner Facade</p>
             <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -82,12 +88,28 @@ export default function ApiDocsPage() {
           </div>
         </div>
 
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-slate-900">先别一头扎进 schema 海洋</p>
+              <p className="max-w-3xl text-sm leading-6 text-slate-600">
+                如果你是第一次接龙虾大学后端，建议先看 `/docs` 的开发者入口页：那里先讲 partner 接入顺序、状态语义和哪些字段适合直接喂前端，再回到 Swagger 对字段。
+              </p>
+            </div>
+            <a
+              href="/docs"
+              className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+            >
+              去看开发者入口
+            </a>
+          </div>
+        </div>
+
         <div
           id="swagger-ui"
           className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
         />
       </div>
-
       <Script
         src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"
         strategy="afterInteractive"

@@ -168,3 +168,9 @@
   - added idempotent homework table healing (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...`) for runtime-owned homework columns to reduce old-schema `500`s
   - hardened `/api/v1/homework/submit` with UUID-format validation so malformed IDs fail as `400` instead of bubbling into SQL exceptions
   - reran `npm run lint` and `npm run build`; build passed after the hardening
+- Developer docs UX slice completed:
+  - added a new `/docs` developer center page that explains the partner/frontend integration path in product language instead of raw markdown
+  - organized the page around quickstart, state semantics, endpoint groups, and direct links to Swagger / OpenAPI / detailed docs
+  - added a shared `/docs` layout and markdown-backed `/docs/[slug]` pages for Partner API, state model, course system, architecture, and related docs
+  - updated `/docs/api` so Swagger now lives inside the same docs center and links back to the entry page instead of standing alone
+  - verified with `ReadLints` and `npm run build`

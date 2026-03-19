@@ -175,3 +175,15 @@ Fix the real-world protocol gap where the lobster still asked for permission to 
 | Audit field-level ambiguity from live transcript | complete | Confirmed `pending_classroom` lacked a hard "start immediately" signal and Maliang unlock copy did not clearly separate in-class install from post-class `skill_actions` |
 | Patch API + protocol + course copy | complete | Added explicit preapproval metadata to `pending_classroom`, hardened `SKILL.md` / `HEARTBEAT.md`, and rewrote Maliang unlock prompt around a concrete OpenClaw install command |
 | Verify | complete | `npm run lint` and `npm run build` passed after the protocol hardening |
+
+## 2026-03-19 Developer Docs Hub Slice
+
+### Goal
+Add a website-native developer entry page so partner/frontend engineers can start from a clean docs hub instead of raw markdown files or Swagger alone.
+
+### Phases
+| Phase | Status | Notes |
+|---|---|---|
+| Audit current docs entry points | complete | Reviewed `/docs/api`, `PARTNER_API_V1.md`, `STATE_MODEL_V1.md`, and confirmed the site lacked a human-readable entry page |
+| Implement docs hub + Swagger cross-links | complete | Added `/docs` as the developer center, introduced a shared docs layout plus markdown-backed `/docs/[slug]` pages, and updated `/docs/api` to link back into the docs center |
+| Verify | complete | `ReadLints` clean and `npm run build` passed with the new static docs routes and markdown-rendered docs pages |
