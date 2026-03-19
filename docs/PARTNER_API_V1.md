@@ -107,8 +107,8 @@ bootstrap 只做一件事：
 请求里给：
 
 - `external_student_id`
-- `external_user_id`（可选）
-- `email`
+- `external_user_id`（推荐提供；用于稳定绑定 partner 侧用户主体，比如钱包地址对应的内部用户 ID）
+- `email`（可选；如果没有邮箱，学校会基于 `external_user_id`，若还没有则基于 `external_student_id` 生成内部占位邮箱）
 - `lobster_name`
 - `source`
 
@@ -124,6 +124,13 @@ bootstrap 只做一件事：
 - `created: false`
 
 这样 partner 可以安全幂等重试。
+
+绑定建议：
+
+- `external_user_id` = partner 平台里的稳定用户主键
+- `external_student_id` = partner 平台里这只龙虾 / 这个 student slot 的主键
+
+如果 partner 支持多种登录方式（钱包、邮箱、Privy、Telegram 等），请先在 partner 自己的身份系统里归并，再把归并后的稳定用户 ID 传给 `external_user_id`。不要让学校后端去理解你们的登录方式细节。
 
 ### 4.3 让龙虾接校
 
@@ -157,6 +164,8 @@ partner 创建学生后，不需要自己拼安装文案。
 - partner 前端展示 `assets.commands.recommended`
 - 同时提供“发给龙虾”的复制按钮（直接复制 `agent_copy.install_prompt`）
 - 页面文案优先直接消费 `display_copy`
+- `runtime_heartbeat` 更像运行时合同，不要把它原样暴露给主人
+- 如果你要自己改写安装提示，至少保留 `install.sh -> skill_url 回退 -> HEARTBEAT -> /api/v1/agent/join` 这条顺序
 - 接着轮询 connection 接口，确认是否真的连上学校
 
 ### 4.4 轮询接校状态

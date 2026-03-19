@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getBaseUrl } from "@/lib/app-url";
 import { buildStudentInstallBundle } from "@/lib/platform/install-bundle";
@@ -21,23 +22,30 @@ export async function POST(req: NextRequest) {
       typeof body?.external_student_id === "string"
         ? body.external_student_id.trim()
         : "";
-    const externalUserId =
+    const externalUserIdRaw =
       typeof body?.external_user_id === "string"
         ? body.external_user_id.trim()
-        : null;
+        : "";
+    const externalUserId = externalUserIdRaw || null;
     const email = typeof body?.email === "string" ? body.email.trim() : "";
     const lobsterName =
       typeof body?.lobster_name === "string" ? body.lobster_name.trim() : "";
     const source = body?.source;
 
-    if (!externalStudentId || !email || !lobsterName) {
+    if (!externalStudentId || !lobsterName) {
       return NextResponse.json(
-        { error: "Missing external_student_id, email, or lobster_name" },
+        { error: "Missing external_student_id or lobster_name" },
         { status: 400 }
       );
     }
 
     const baseUrl = getBaseUrl(req);
+    const normalizedEmail =
+      email ||
+      buildPartnerSyntheticEmail({
+        partnerSlug: partner.partnerSlug,
+        stableExternalKey: externalUserId || externalStudentId,
+      });
     const existing = await findPartnerStudentByExternalId(
       partner.partnerId,
       externalStudentId
@@ -76,7 +84,7 @@ export async function POST(req: NextRequest) {
     }
 
     const created = await createStudentEnrollment({
-      email,
+      email: normalizedEmail,
       lobsterName,
       source,
       prepareIntroClassroom: true,
@@ -137,4 +145,16 @@ export async function POST(req: NextRequest) {
     console.error("Partner create student error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
+}
+
+function buildPartnerSyntheticEmail(params: {
+  partnerSlug: string;
+  stableExternalKey: string;
+}) {
+  const hash = createHash("sha256")
+    .update(`${params.partnerSlug}:${params.stableExternalKey}`)
+    .digest("hex")
+    .slice(0, 24);
+
+  return `partner-${params.partnerSlug}-${hash}@users.claw.invalid`;
 }

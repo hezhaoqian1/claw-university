@@ -72,10 +72,16 @@ export const DOCS_NAV_ITEMS: DocsNavItem[] = [
 const SOURCE_FILE_TO_SLUG = new Map(
   DOCS_NAV_ITEMS.map((item) => [item.sourceFile, item.slug])
 );
+const SPECIAL_DOC_TARGETS = new Map<string, string>([["README.md", "/docs"]]);
 
 const marked = new Marked({
   gfm: true,
   breaks: false,
+  renderer: {
+    html(token) {
+      return `<pre><code>${escapeHtml(token.text)}</code></pre>`;
+    },
+  },
 });
 
 export function getDocsNavItem(slug: string) {
@@ -90,7 +96,7 @@ export async function getDocHtmlBySlug(slug: string) {
 
   const docsPath = path.join(process.cwd(), "docs", item.sourceFile);
   const markdown = await readFile(docsPath, "utf8");
-  const html = marked.parse(rewriteLocalDocLinks(markdown));
+  const html = await marked.parse(rewriteLocalDocLinks(markdown));
 
   return {
     ...item,
@@ -100,14 +106,35 @@ export async function getDocHtmlBySlug(slug: string) {
 
 function rewriteLocalDocLinks(markdown: string) {
   return markdown.replace(
-    /\]\((?:\.\/)?([A-Z0-9_]+\.md)\)/g,
-    (match, fileName: string) => {
+    /(?<!!)\]\(([^)]+\.md(?:#[^)]+)?)\)/g,
+    (match, rawTarget: string) => {
+      if (/^[a-z]+:/i.test(rawTarget)) {
+        return match;
+      }
+
+      const [targetPath, anchor] = rawTarget.split("#", 2);
+      const fileName = path.posix.basename(targetPath.replace(/\\/g, "/"));
+      const specialTarget = SPECIAL_DOC_TARGETS.get(fileName);
+
+      if (specialTarget) {
+        return `](${specialTarget}${anchor ? `#${anchor}` : ""})`;
+      }
+
       const slug = SOURCE_FILE_TO_SLUG.get(fileName);
       if (!slug) {
         return match;
       }
 
-      return `](/docs/${slug})`;
+      return `](/docs/${slug}${anchor ? `#${anchor}` : ""})`;
     }
   );
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }

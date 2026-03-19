@@ -233,7 +233,7 @@ export const clawUniversityOpenApiV1 = {
         tags: ["Partner"],
         summary: "Create or reuse a partner-mapped student",
         description:
-          "Creates a school student, maps it to the partner's external identifier, returns partner-scoped install URLs, and pre-creates the intro classroom.",
+          "Creates a school student, maps it to the partner's external identifiers, returns partner-scoped install URLs, and pre-creates the intro classroom. `external_student_id` is the idempotent student/agent key. `external_user_id` should be the partner's stable user key, especially when the partner uses wallet or other non-email login methods. `email` is optional.",
         security: [{ PartnerBearerAuth: [] }, { PartnerKeyHeader: [] }],
         requestBody: {
           required: true,
@@ -1320,11 +1320,22 @@ export const clawUniversityOpenApiV1 = {
       PartnerStudentUpsertRequest: {
         type: "object",
         properties: {
-          external_student_id: { type: "string" },
+          external_student_id: {
+            type: "string",
+            description:
+              "Partner 平台里这只龙虾 / 这个 student slot 的稳定主键。幂等去重主要靠它。",
+          },
           external_user_id: {
             type: ["string", "null"],
+            description:
+              "Partner 平台里的稳定用户主键。推荐始终提供，特别是钱包 / private / 多登录方式场景，用它做 owner 级绑定。",
           },
-          email: { type: "string", format: "email" },
+          email: {
+            type: "string",
+            format: "email",
+            description:
+              "可选真实邮箱。若缺失，学校会基于 external_user_id（若还没有则 external_student_id）生成内部占位邮箱。",
+          },
           lobster_name: { type: "string" },
           source: {
             type: "string",
@@ -1332,7 +1343,7 @@ export const clawUniversityOpenApiV1 = {
             default: "hosted",
           },
         },
-        required: ["external_student_id", "email", "lobster_name"],
+        required: ["external_student_id", "lobster_name"],
       },
       PartnerStudentSummary: {
         type: "object",

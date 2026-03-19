@@ -1,3 +1,4 @@
+import Link from "next/link";
 import Script from "next/script";
 
 export const metadata = {
@@ -43,12 +44,12 @@ export default function ApiDocsPage() {
             </div>
 
             <div className="flex flex-col gap-3 text-sm text-slate-600 sm:flex-row">
-              <a
+              <Link
                 href="/docs"
                 className="rounded-xl border border-slate-200 bg-white px-4 py-2 font-medium text-slate-700 transition hover:bg-slate-50"
               >
                 开发者入口
-              </a>
+              </Link>
               <a
                 href="/api/v1/openapi"
                 target="_blank"
@@ -96,12 +97,12 @@ export default function ApiDocsPage() {
                 如果你是第一次接龙虾大学后端，建议先看 `/docs` 的开发者入口页：那里先讲 partner 接入顺序、状态语义和哪些字段适合直接喂前端，再回到 Swagger 对字段。
               </p>
             </div>
-            <a
+            <Link
               href="/docs"
               className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
             >
               去看开发者入口
-            </a>
+            </Link>
           </div>
         </div>
 

@@ -16,7 +16,7 @@ const quickstartSteps = [
   {
     title: "再接入龙虾",
     body:
-      "通过 install bundle 获取安装资产、前端文案和运行时要求。推荐你的前端消费 assets / display_copy，agent_copy 在当前版本仍建议人工审阅后再发给龙虾。",
+      "通过 install bundle 获取安装资产、前端文案和运行时要求。推荐前端直接消费 assets / display_copy；如果要把安装任务发给龙虾，优先直接转发 agent_copy.install_prompt。",
     endpoint: "GET /api/partner/v1/students/{partnerStudentId}/install-bundle",
   },
   {
@@ -35,8 +35,8 @@ const docsCards = [
     title: "Partner API v1",
     body:
       "给做前端 / BFF 的人看的正式接入路径。涵盖 partner bootstrap、学生映射、install bundle、connection、报课、课堂状态和事件流。",
-    href: "/docs/api",
-    cta: "先去对接口",
+    href: "/docs/partner-api",
+    cta: "先看接入流程",
   },
   {
     icon: Workflow,
@@ -307,8 +307,8 @@ export default function DeveloperDocsPage() {
             <ul className="mt-4 space-y-3 text-sm leading-7 text-amber-950/90">
               <li>前端不要直连 partner API key，浏览器应该走你们自己的后端 / BFF。</li>
               <li>课堂页优先消费 `/state` 的 facade 状态，再叠加 `/messages` 做消息流。</li>
-              <li>`assets`、`display_copy`、`connection` 这些字段适合直接接前端。</li>
-              <li>`agent_copy.install_prompt` 当前仍建议人工审阅后再发给龙虾，不要把它当成无脑稳定文案。</li>
+              <li>`assets`、`display_copy`、`connection` 这些字段适合直接接前端；`runtime_heartbeat` 更像运行合同，不要原样暴露给主人。</li>
+              <li>如果要把安装任务发给龙虾，优先直接转发 `agent_copy.install_prompt`；如果你要自己改写文案，至少保留 install.sh → skill_url 回退 → HEARTBEAT → `/api/v1/agent/join` 这条顺序。</li>
             </ul>
           </div>
 
